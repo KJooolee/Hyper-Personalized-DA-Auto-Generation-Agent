@@ -43,22 +43,22 @@ CTA: {copy_cta}
 Pass threshold: {pass_score}/100
 
 Respond ONLY with valid JSON matching this exact structure:
-{
+{{
   "passed": true,
   "score": 85,
-  "category_scores": {
+  "category_scores": {{
     "brand_compliance": 90,
     "copy_compliance": 80,
     "layout_compliance": 85,
     "visual_quality": 80
-  },
+  }},
   "issues": [
-    {
+    {{
       "category": "브랜드|카피|레이아웃|비주얼|법적요소",
       "item": "specific issue name",
       "severity": "critical|major|minor",
       "detail": "detailed explanation with specific fix instruction"
-    }
+    }}
   ],
   "recommendations": [
     "specific actionable fix 1",
@@ -68,4 +68,4 @@ Respond ONLY with valid JSON matching this exact structure:
     "highest priority fix first",
     "second priority fix"
   ]
-}
+}}

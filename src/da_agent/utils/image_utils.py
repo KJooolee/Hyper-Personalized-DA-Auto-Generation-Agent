@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import io
 from pathlib import Path
 
@@ -20,6 +21,28 @@ def _load_korean_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
     # Fallback: 한글이 깨질 수 있음 — assets/fonts/ 에 폰트 파일을 추가하세요
     return ImageFont.load_default(size=size)
 
+
+
+def prepare_image_for_api(path_or_url: str) -> str:
+    """파일 경로 또는 URL을 OpenAI Vision API가 수락하는 형식으로 변환합니다.
+
+    - HTTPS/HTTP URL → 그대로 반환
+    - 로컬 파일 경로 → base64 data URL로 변환 (jpg/png/gif/webp 지원)
+    """
+    if path_or_url.startswith(("http://", "https://")):
+        return path_or_url
+
+    path = Path(path_or_url)
+    mime_map = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+    }
+    mime = mime_map.get(path.suffix.lower(), "image/jpeg")
+    b64 = base64.b64encode(path.read_bytes()).decode("utf-8")
+    return f"data:{mime};base64,{b64}"
 
 async def download_image(url: str) -> Image.Image:
     """URL에서 이미지를 다운로드하여 PIL Image로 반환합니다."""

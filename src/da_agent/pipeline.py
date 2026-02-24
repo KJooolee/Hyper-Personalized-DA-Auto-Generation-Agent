@@ -33,7 +33,7 @@ class PipelineResult:
 
 
 async def run_pipeline(
-    user_clicked_ad_image: str,
+    user_clicked_ad_image: str | list[str],
     product_image: str,
     product_info: dict,
     brand_identity: dict,

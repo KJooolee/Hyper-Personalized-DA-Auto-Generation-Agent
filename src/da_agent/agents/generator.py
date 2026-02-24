@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import fal_client
 from PIL import Image
 
@@ -82,6 +84,10 @@ async def generate_ad_image(
 
 async def _generate_base_image(blueprint: Blueprint, settings) -> Image.Image:
     """FLUX.1 [dev] API로 배경 이미지를 생성합니다."""
+    # fal_client reads FAL_KEY directly from os.environ (not from pydantic settings)
+    if settings.fal_key:
+        os.environ["FAL_KEY"] = settings.fal_key
+
     result = await fal_client.run_async(
         settings.image_gen_model,
         arguments={

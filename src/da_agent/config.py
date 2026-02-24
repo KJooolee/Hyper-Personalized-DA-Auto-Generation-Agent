@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     image_width: int = 1080
     image_height: int = 1080
 
+    # SSL / Proxy Configuration
+    # 기업 프록시 환경에서 SSL 검증 오류 발생 시 false로 설정
+    ssl_verify: bool = True
+    # 커스텀 CA 인증서 경로 (기업 CA 번들 경로, 비워두면 certifi 기본값 사용)
+    ca_bundle_path: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

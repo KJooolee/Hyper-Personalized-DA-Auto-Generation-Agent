@@ -88,17 +88,17 @@ Based on layout type "{layout_type}", specify bounding boxes for a {image_width}
 Ensure product, text, and logo regions do not overlap.
 
 Respond ONLY with valid JSON matching this exact structure:
-{
-  "ad_copy": {
+{{
+  "ad_copy": {{
     "headline": "한글 헤드라인",
     "subheadline": "한글 서브카피",
     "cta": "행동 유도 문구"
-  },
+  }},
   "image_prompt": "detailed English prompt for FLUX.1",
-  "layout_guide": {
-    "product_bbox": {"x": 0, "y": 0, "width": 0, "height": 0},
-    "text_bbox": {"x": 0, "y": 0, "width": 0, "height": 0},
-    "logo_bbox": {"x": 0, "y": 0, "width": 0, "height": 0},
+  "layout_guide": {{
+    "product_bbox": {{"x": 0, "y": 0, "width": 0, "height": 0}},
+    "text_bbox": {{"x": 0, "y": 0, "width": 0, "height": 0}},
+    "logo_bbox": {{"x": 0, "y": 0, "width": 0, "height": 0}},
     "background_desc": "background description"
-  }
-}
+  }}
+}}

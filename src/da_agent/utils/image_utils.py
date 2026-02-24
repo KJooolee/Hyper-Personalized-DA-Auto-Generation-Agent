@@ -52,6 +52,17 @@ async def download_image(url: str) -> Image.Image:
     return Image.open(io.BytesIO(response.content)).convert("RGBA")
 
 
+async def load_image(path_or_url: str) -> Image.Image:
+    """로컬 파일 경로 또는 URL에서 PIL Image를 로드합니다.
+
+    - HTTPS/HTTP URL → httpx로 다운로드
+    - 로컬 파일 경로 → PIL로 직접 열기
+    """
+    if path_or_url.startswith(("http://", "https://")):
+        return await download_image(path_or_url)
+    return Image.open(path_or_url).convert("RGBA")
+
+
 def overlay_text(
     image: Image.Image,
     text: str,

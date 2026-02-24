@@ -2,12 +2,12 @@ import base64
 import json
 from pathlib import Path
 
-from openai import AsyncOpenAI
 from PIL import Image
 
 from da_agent.config import get_settings
 from da_agent.models.blueprint import AdCopy
 from da_agent.models.evaluation import EvaluationResult
+from da_agent.utils.http_client import create_openai_client
 from da_agent.utils.image_utils import image_to_bytes
 
 _TEMPLATE_PATH = (
@@ -35,7 +35,7 @@ async def evaluate_ad(
     - 텍스트 직접 검사: 금지어·필수 문구·법적 요소 (ad_copy 문자열)
     """
     settings = get_settings()
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    client = create_openai_client()
 
     template = _TEMPLATE_PATH.read_text(encoding="utf-8")
     prompt = template.format(

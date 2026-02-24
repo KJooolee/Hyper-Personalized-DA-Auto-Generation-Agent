@@ -1,12 +1,11 @@
 import json
 from pathlib import Path
 
-from openai import AsyncOpenAI
-
 from da_agent.config import get_settings
 from da_agent.models.blueprint import Blueprint
 from da_agent.models.evaluation import EvaluationResult
 from da_agent.models.style_dna import StyleDNA
+from da_agent.utils.http_client import create_openai_client
 
 _TEMPLATE_PATH = (
     Path(__file__).parent.parent / "utils/prompt_templates/architect.txt"
@@ -51,7 +50,7 @@ async def create_blueprint(
 ) -> Blueprint:
     """Stage 2: Style DNA + 광고주 데이터 → 생성 설계도(Blueprint) 작성."""
     settings = get_settings()
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    client = create_openai_client()
 
     template = _TEMPLATE_PATH.read_text(encoding="utf-8")
     feedback_section = _build_feedback_section(feedback or [])

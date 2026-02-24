@@ -41,7 +41,7 @@ image_style, layout_style, copy_style = await asyncio.gather(
 
 ---
 
-## 2. Methodology
+### Stage 2 — The Architect (생성 설계도 작성)
 
 추출된 Style DNA와 광고주 요청 데이터를 결합해 Stage 3의 입력이 될 정밀 설계도를 생성합니다.
 **재생성 루프 시**: 직전 Stage 4의 피드백 리포트가 컨텍스트에 추가되어 이전 실패 원인을 반영합니다.
@@ -56,10 +56,7 @@ image_style, layout_style, copy_style = await asyncio.gather(
  copy_style
 ```
 
-- **Layout Style Agent**
-  - 시각적 계층 구조 분석
-  - 제품 및 텍스트 배치 구조 추론
-  - 시선 흐름 모델링
+#### 출력 (Blueprint)
 
 | 출력물 | 설명 |
 |--------|------|
@@ -67,11 +64,14 @@ image_style, layout_style, copy_style = await asyncio.gather(
 | **이미지 생성 프롬프트** | FLUX.1 입력용 상세 영문 프롬프트 (브랜드 컬러, 조명, 분위기, 제품 묘사 포함) |
 | **레이아웃 가이드** | 제품·텍스트·로고 영역의 bounding box 좌표 + 배경 구성 방향 |
 
+**한국 감성 → 영문 프롬프트 변환**: 한국 광고 특유의 감성 키워드는 FLUX.1이 이해할 수 있는 시각 묘사 영문으로 변환합니다. (예: "새벽 감성" → `"soft pre-dawn atmosphere, misty morning light, blue-hour glow"`)
+이 변환 규칙은 `prompt_templates/architect.txt`에 내재화합니다.
+
 **사용 모델**: `gpt-4o` (창의적 카피 + 프롬프트 엔지니어링이 전체 품질 결정)
 
 ---
 
-### 2.2 Stage II — Architect (Blueprint Construction)
+### Stage 3 — The Generator (최종 이미지 합성)
 
 설계도를 바탕으로 세 가지 제약을 동시 만족하는 광고 이미지를 생성합니다.
 
@@ -92,6 +92,8 @@ Blueprint
       합성 이미지 (Stage 4로 전달)
 ```
 
+**한글 폰트 처리**: Pillow 기본 폰트는 한글을 지원하지 않습니다. `image_utils.py`에서 NanumGothic / NotoSansKR 폰트를 명시적으로 로드하여 한글 카피를 렌더링합니다. 프로젝트에 폰트 파일(`assets/fonts/`)을 포함하며, 가중치(Regular/Bold)별로 로드 가능합니다.
+
 **실행 환경**: fal.ai 또는 Replicate API — 로컬 GPU 불필요
 
 ---
@@ -102,13 +104,15 @@ Blueprint
 
 #### 검증 항목
 
-| 카테고리 | 검증 내용 |
-|----------|-----------|
-| 브랜드 | 지정 컬러 사용, 로고 위치·크기, 금지 폰트 미사용 |
-| 카피 | 톤앤매너 적합성, 금지어 미포함, 필수 문구 포함 |
-| 레이아웃 | 여백 규정, 텍스트 가독성, 제품 노출 비율 |
-| 매체 규격 | 이미지 사이즈, 해상도, 파일 포맷 |
-| 법적 요소 | 필수 고지 문구 포함 여부 |
+| 카테고리 | 검증 방식 | 검증 내용 |
+|----------|-----------|-----------|
+| 브랜드 | Vision 분석 | 지정 컬러 사용, 로고 위치·크기, 금지 폰트 미사용 |
+| 카피 | **텍스트 직접 검사** | 톤앤매너 적합성, 금지어 미포함, 필수 문구 포함 |
+| 레이아웃 | Vision 분석 | 여백 규정, 텍스트 가독성, 제품 노출 비율 |
+| 매체 규격 | 메타데이터 | 이미지 사이즈, 해상도, 파일 포맷 |
+| 법적 요소 | **텍스트 직접 검사** | 필수 고지 문구 포함 여부 |
+
+> **금지어/법적 검증 방식**: 이미지 내 OCR 재시도 대신, Stage 2에서 생성된 카피 텍스트(`ad_copy`)를 문자열 그대로 Evaluator에 전달합니다. 이미지 내 소형·장식 폰트 한글의 OCR 오인식 리스크를 제거하고 검증 신뢰도를 높입니다.
 
 #### 평가 결과 출력
 
@@ -147,7 +151,7 @@ max_iterations = 3  (환경변수로 설정 가능)
 while iteration <= max_iterations:
     blueprint = architect(style_dna, product_info, brand, guidelines, feedback)
     image     = generator(blueprint)
-    result    = evaluator(image, guidelines)
+    result    = evaluator(image, blueprint.ad_copy, guidelines)  # 카피 텍스트 직접 전달
 
     if result.passed:
         return image  ← 최종 광고 이미지 반환
@@ -162,7 +166,7 @@ return image  ← max 도달 시 최고 점수 이미지 반환 + 경고 로그
 
 ---
 
-### 2.3 Stage III — Generator (Image Synthesis)
+## 기술 스택
 
 | 레이어 | 기술 / 서비스 | 선택 이유 |
 |--------|---------------|-----------|
@@ -171,20 +175,18 @@ return image  ← max 도달 시 최고 점수 이미지 반환 + 경고 로그
 | Stage 1 Vision | `gpt-4o-mini` / `claude-3-haiku` | 저비용 Vision (3개 독립 호출) |
 | Stage 2 LLM | `gpt-4o` | 고품질 카피·프롬프트 생성 |
 | Stage 3 Image Gen | FLUX.1 [dev] via `fal.ai` / `Replicate` | 로컬 GPU 불필요 |
-| Stage 3 후처리 | `Pillow` | 텍스트 오버레이, 로고 합성 |
+| Stage 3 후처리 | `Pillow` + 한글 폰트(NanumGothic/NotoSansKR) | 한글 텍스트 오버레이, 로고 합성 |
 | Stage 4 Evaluator | `gpt-4o-mini` Vision | 저비용 이미지 분석·채점 |
 | 데이터 검증 | `pydantic` v2 | Stage 간 데이터 모델 타입 보장 |
-| 설정 관리 | `python-dotenv` + `.env` | API 키 환경변수 분리 |
+| 설정 관리 | `pydantic-settings` + `.env` | API 키 환경변수 분리 |
 
-- **Base Generation**
-  - FLUX.1 [dev] 모델을 사용한 배경 및 오브젝트 생성
+---
 
-- **Structural Consistency Control**
-  - ControlNet을 통한 형태 및 레이아웃 유지
+## 비용 최적화 전략
 
 ```
 Stage 1  ─── gpt-4o-mini vision  ← 3개 모듈 각각 독립 호출 (병렬)
-                                    단, 저비용 모델이므로 개별 호출이어도 비용 부담 낮음
+                                    저비용 모델이므로 개별 호출이어도 비용 부담 낮음
                                     병렬 처리로 지연 시간은 1회 호출 수준으로 유지
 
 Stage 2  ─── gpt-4o              ← 설계도 품질 = 전체 광고 성과를 결정
@@ -194,7 +196,7 @@ Stage 3  ─── FLUX.1 API          ← 이미지 1장당 약 $0.03~0.05
                                     로컬 GPU 서버 운영 비용 대비 절감
 
 Stage 4  ─── gpt-4o-mini vision  ← 평가는 패턴 인식 수준, 고성능 모델 불필요
-                                    루프당 추가 비용을 최소화
+                                    카피 텍스트는 직접 전달 → OCR 비용/오류 제거
 
 공통     ─── Prompt Caching       ← 브랜드 가이드라인 등 반복 시스템 프롬프트
                                     OpenAI / Anthropic Prompt Cache 활용
@@ -203,10 +205,7 @@ Stage 4  ─── gpt-4o-mini vision  ← 평가는 패턴 인식 수준, 고�
                                     기본값 3회 (비용 = Stage 비용 × 최대 3배)
 ```
 
-- 텍스트 가독성 검사
-- 로고 위치 및 크기 검증
-- 금지 요소 포함 여부 확인
-- 레이아웃 규칙 준수 여부 평가
+---
 
 ## 환경변수 (.env)
 
@@ -236,6 +235,10 @@ IMAGE_GEN_MODEL=fal-ai/flux/dev    # Stage 3 이미지 생성 모델
 # ── Pipeline Configuration ────────────────────────────────────
 MAX_EVAL_ITERATIONS=3              # 평가 루프 최대 반복 횟수
 EVAL_PASS_SCORE=80                 # 가이드라인 통과 기준 점수 (0~100)
+
+# ── Image Configuration ───────────────────────────────────────
+IMAGE_WIDTH=1080                   # 생성 이미지 너비 (px)
+IMAGE_HEIGHT=1080                  # 생성 이미지 높이 (px)
 ```
 
 ---
@@ -257,12 +260,17 @@ Stage 1 출력 — Style DNA:
   copy_style   : CopyStyle    # { tone, length, emphasis_type, keywords[] }
 
 Stage 2 출력 — Blueprint:
-  ad_copy      : AdCopy       # { headline, subheadline, cta }
+  ad_copy      : AdCopy       # { headline, subheadline, cta }  ← 평가 시 직접 전달
   image_prompt : str          # FLUX.1 영문 프롬프트
   layout_guide : LayoutGuide  # { product_bbox, text_bbox, logo_bbox, background_desc }
 
 Stage 3 출력:
   generated_image : str       # 합성 완료 이미지 URL
+
+Stage 4 입력 — 이중 경로:
+  generated_image : str       # Vision 분석 대상 (시각 요소 검증)
+  ad_copy         : AdCopy    # 텍스트 직접 검사 (금지어·법적 요소 검증)
+  guidelines      : dict      # 검증 기준
 
 Stage 4 출력 — EvaluationResult:
   passed          : bool
@@ -285,11 +293,16 @@ Stage 4 출력 — EvaluationResult:
 Hyper-Personalized-DA-Auto-Generation-Agent/
 ├── pyproject.toml               # uv 프로젝트 설정, 의존성 정의
 ├── uv.lock                      # 고정된 의존성 버전 (커밋 대상)
-├── .python-version              # Python 버전 고정 (예: 3.12)
+├── .python-version              # Python 버전 고정 (3.12)
 ├── .env                         # API 키 (gitignore 대상)
 ├── .env.example                 # API 키 템플릿 (커밋 대상)
 ├── README.md
 ├── LICENSE
+│
+├── assets/
+│   └── fonts/                   # 한글 폰트 파일
+│       ├── NanumGothic.ttf
+│       └── NanumGothicBold.ttf
 │
 ├── src/
 │   └── da_agent/
@@ -310,22 +323,23 @@ Hyper-Personalized-DA-Auto-Generation-Agent/
 │       │
 │       ├── models/
 │       │   ├── __init__.py
-│       │   ├── style_dna.py          # ImageStyle, LayoutStyle, CopyStyle
+│       │   ├── style_dna.py          # ImageStyle, LayoutStyle, CopyStyle, StyleDNA
 │       │   ├── blueprint.py          # AdCopy, LayoutGuide, Blueprint
 │       │   └── evaluation.py         # Issue, EvaluationResult
 │       │
 │       └── utils/
 │           ├── __init__.py
-│           ├── image_utils.py        # 이미지 전처리, Pillow 후처리
+│           ├── image_utils.py        # 이미지 전처리, 한글 Pillow 후처리
 │           └── prompt_templates/
 │               ├── extractor/
 │               │   ├── image_style.txt
 │               │   ├── layout_style.txt
 │               │   └── copy_style.txt
-│               ├── architect.txt
+│               ├── architect.txt     # 한국 감성 → 영문 변환 규칙 포함
 │               └── evaluator.txt
 │
 └── tests/
+    ├── __init__.py
     ├── test_extractor.py
     ├── test_architect.py
     ├── test_generator.py
@@ -334,12 +348,12 @@ Hyper-Personalized-DA-Auto-Generation-Agent/
 
 ---
 
-## 5. Roadmap
+## Roadmap
 
 - [ ] Stage 1: 병렬 Vision 추출기 3종 구현 (image / layout / copy)
 - [ ] Stage 2: GPT-4o 기반 설계도 생성 (카피 + 이미지 프롬프트 + 레이아웃 좌표)
-- [ ] Stage 3: FLUX.1 API 연동, ControlNet 레이아웃 제어, Pillow 후처리
-- [ ] Stage 4: 가이드라인 평가 모델 + 구조화된 피드백 리포트 생성
+- [ ] Stage 3: FLUX.1 API 연동, ControlNet 레이아웃 제어, Pillow 한글 후처리
+- [ ] Stage 4: 가이드라인 평가 모델 + 이중 검증 경로 (Vision + 텍스트 직접)
 - [ ] 평가 루프 오케스트레이터 (max_iterations, pass_score 기반 종료 조건)
 - [ ] Pydantic 데이터 모델 정의 (Stage 간 타입 보장)
 - [ ] 비용 모니터링 및 토큰 사용량 로깅
@@ -367,7 +381,6 @@ uv run python -m da_agent.pipeline
 
 ---
 
-## 6. License
+## License
 
-MIT License  
-Copyright (c) 2026
+MIT License — Copyright (c) 2026 Git_ju

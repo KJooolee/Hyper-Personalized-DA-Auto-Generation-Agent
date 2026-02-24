@@ -13,11 +13,11 @@ from da_agent.pipeline import run_pipeline
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
 # ── 예시 입력값 (실제 사용 시 교체) ──────────────────────────
-example_clicked_ad   = "https://example.com/clicked_ad.jpg"
-example_product_img  = "https://example.com/product.jpg"
+example_clicked_ad   = "./axample/img/ad_1.png","./example/img/ad_2.png","./example/img/ad_3.png"  # 사용자가 클릭한 광고 이미지 URL (병렬 추출 테스트용)
+example_product_img  = "./example/img/product.png"  # 광고할 제품 이미지 URL
 example_product_info = {
-    "name": "테스트 제품",
-    "description": "일상에 여유를 더하는 라이프스타일 제품",
+    "name": "카본 알파 플러스 러닝화",
+    "description": "러닝 에너지를 폭발시키는 단 하나의 선택",
     "features": ["친환경 소재", "미니멀 디자인", "30일 무료 반품"],
 }
 example_brand = {
@@ -26,10 +26,10 @@ example_brand = {
     "secondary_colors": ["#F5F5F0"],
 }
 example_guidelines = {
-    "required_elements": ["브랜드 로고", "가격 정보"],
+    "required_elements": ["제품 이미지", "무드"],
     "forbidden_elements": ["최저가", "100% 보장"],
     "tone_constraints": ["과장 표현 금지"],
-    "media_specs": {"width": 1080, "height": 1080, "format": "JPG"},
+    "media_specs": {"width": 1660, "height": 260, "format": "PNG"},
 }
 
 async def main() -> None:

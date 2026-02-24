@@ -13,7 +13,7 @@ from da_agent.pipeline import run_pipeline
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
 # ── 예시 입력값 (실제 사용 시 교체) ──────────────────────────
-example_clicked_ad   = "./axample/img/ad_1.png","./example/img/ad_2.png","./example/img/ad_3.png"  # 사용자가 클릭한 광고 이미지 URL (병렬 추출 테스트용)
+example_clicked_ad   = ["./example/img/ad_1.png", "./example/img/ad_2.png", "./example/img/ad_3.png"]  # 사용자가 클릭한 광고 이미지 (병렬 추출)
 example_product_img  = "./example/img/product.png"  # 광고할 제품 이미지 URL
 example_product_info = {
     "name": "카본 알파 플러스 러닝화",

@@ -6,8 +6,8 @@ from PIL import Image
 from da_agent.config import get_settings
 from da_agent.models.blueprint import Blueprint
 from da_agent.utils.image_utils import (
-    download_image,
     image_to_bytes,
+    load_image,
     overlay_logo,
     overlay_text,
 )
@@ -67,7 +67,7 @@ async def generate_ad_image(
     # 3. 브랜드 로고 합성
     logo_url = brand_identity.get("logo_url")
     if logo_url:
-        logo_img = await download_image(logo_url)
+        logo_img = await load_image(logo_url)
         composed = overlay_logo(
             composed,
             logo=logo_img,
@@ -98,4 +98,4 @@ async def _generate_base_image(blueprint: Blueprint, settings) -> Image.Image:
     )
 
     image_url = result["images"][0]["url"]
-    return await download_image(image_url)
+    return await load_image(image_url)

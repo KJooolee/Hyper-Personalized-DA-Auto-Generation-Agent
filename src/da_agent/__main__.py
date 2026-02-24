@@ -8,7 +8,12 @@
 import asyncio
 import logging
 
-from da_agent.pipeline import run_pipeline
+from da_agent.utils.http_client import configure_ssl_globally
+
+# SSL 전역 패치 — 반드시 다른 import보다 먼저 실행 (fal_client 포함 모든 라이브러리에 적용)
+configure_ssl_globally()
+
+from da_agent.pipeline import run_pipeline  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 

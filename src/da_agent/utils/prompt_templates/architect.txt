@@ -69,6 +69,18 @@ They define TONE and WRITING STYLE only — never copy them literally.
 
 Copy MUST accurately describe {product_name} as given — do NOT invent benefits or promotions.
 
+#### Banner Copy Length Limits (applies when {image_width} > {image_height} × 2.5)
+The text zone in a horizontal banner is very narrow in height (~260px).
+Exceeding these limits causes text overflow or awkward one-character orphan lines.
+
+| Element | Max characters | Guideline |
+|---|---|---|
+| headline | **20자** | 1줄 완성 목표, 최대 2줄 (16자 이하 권장) |
+| subheadline | **30자** | 1줄 완성 목표, 최대 2줄 — 절대 3줄 금지 |
+| cta | **10자** | 버튼 안에 들어갈 짧은 문구 |
+
+**Orphan prevention rule**: 마지막 줄에 혼자 남는 어절이 생기지 않도록 전체 문장 길이를 조정하세요.
+
 ### 2. Image Generation Prompt (English, for FLUX.1)
 
 CRITICAL — The real product photo will be composited SEPARATELY as a PNG on top of the generated image.

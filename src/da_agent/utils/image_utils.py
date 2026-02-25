@@ -65,21 +65,49 @@ async def load_image(path_or_url: str) -> Image.Image:
 
 
 def _wrap_text(text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list[str]:
-    """한글 텍스트를 max_width에 맞게 자동 줄바꿈합니다."""
+    """한글 텍스트를 max_width에 맞게 자동 줄바꿈합니다.
+
+    어절(띄어쓰기) 단위로 줄바꿈을 먼저 시도합니다.
+    단일 어절이 max_width를 초과하는 경우에만 글자 단위로 강제 분할합니다.
+    이 방식으로 "가" / "금" 같은 어절 중간 쪼개짐을 방지합니다.
+    """
+    if not text:
+        return [""]
+
     lines: list[str] = []
     current_line = ""
-    for char in text:
-        test_line = current_line + char
-        bbox = font.getbbox(test_line)
-        if bbox[2] - bbox[0] <= max_width:
-            current_line = test_line
+
+    for word in text.split(" "):
+        candidate = (current_line + " " + word).strip() if current_line else word
+        w = font.getbbox(candidate)[2] - font.getbbox(candidate)[0]
+
+        if w <= max_width:
+            current_line = candidate
         else:
+            # 현재 줄에 내용이 있으면 확정
             if current_line:
                 lines.append(current_line)
-            current_line = char
+                current_line = ""
+
+            # 어절 자체가 max_width 초과 → 글자 단위 강제 분할
+            word_w = font.getbbox(word)[2] - font.getbbox(word)[0]
+            if word_w > max_width:
+                char_buf = ""
+                for char in word:
+                    test = char_buf + char
+                    if font.getbbox(test)[2] - font.getbbox(test)[0] <= max_width:
+                        char_buf = test
+                    else:
+                        if char_buf:
+                            lines.append(char_buf)
+                        char_buf = char
+                current_line = char_buf
+            else:
+                current_line = word
+
     if current_line:
         lines.append(current_line)
-    return lines
+    return lines if lines else [""]
 
 
 def measure_text_height(

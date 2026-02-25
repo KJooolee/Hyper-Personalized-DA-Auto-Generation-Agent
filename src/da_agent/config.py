@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     eval_pass_score: int = 80
 
     # Image Configuration
-    image_width: int = 1080
-    image_height: int = 1080
+    image_width: int = 1660
+    image_height: int = 260
 
     # SSL / Proxy Configuration
     # 기업 프록시 환경에서 SSL 검증 오류 발생 시 false로 설정

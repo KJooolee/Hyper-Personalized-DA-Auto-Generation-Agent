@@ -139,6 +139,66 @@ def overlay_text(
     return img
 
 
+def draw_text_zone_background(
+    image: Image.Image,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    color: tuple[int, int, int] = (20, 20, 20),
+    alpha: int = 210,
+) -> Image.Image:
+    """텍스트 영역에 반투명 컬러 배경 밴드를 그립니다.
+
+    실제 DA처럼 배경 이미지 위에 불투명한 컬러 존을 만들어
+    텍스트 가독성을 보장합니다.
+    """
+    img = image.copy().convert("RGBA")
+    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    draw.rectangle([(x, y), (x + width, y + height)], fill=(*color, alpha))
+    return Image.alpha_composite(img, overlay)
+
+
+def overlay_cta_button(
+    image: Image.Image,
+    text: str,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    bg_color: tuple[int, int, int, int] = (255, 80, 0, 255),
+    text_color: tuple[int, int, int, int] = (255, 255, 255, 255),
+    radius: int = 28,
+    font_size: int = 26,
+) -> Image.Image:
+    """실제 버튼 모양의 CTA를 그립니다.
+
+    둥근 사각형 배경 위에 텍스트를 중앙 정렬하여
+    실제 DA의 클릭 유도 버튼처럼 보이게 합니다.
+    """
+    img = image.copy().convert("RGBA")
+    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    draw.rounded_rectangle(
+        [x, y, x + width, y + height],
+        radius=radius,
+        fill=bg_color,
+    )
+
+    font = _load_korean_font(font_size, bold=True)
+    bbox = font.getbbox(text)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    text_x = x + (width - text_w) // 2
+    text_y = y + (height - text_h) // 2
+
+    draw.text((text_x, text_y), text, font=font, fill=text_color)
+
+    return Image.alpha_composite(img, overlay)
+
+
 # rembg 세션은 프로세스 당 한 번만 생성 (모델 재로드 방지)
 _rembg_session = new_session("u2net")
 

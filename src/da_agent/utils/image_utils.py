@@ -222,19 +222,31 @@ def overlay_product(
 ) -> Image.Image:
     """실제 제품 이미지를 지정 영역(product_bbox)에 합성합니다.
 
-    - 비율 유지 리사이즈 (contain)
+    - 비율 유지 리사이즈 (contain, 확대·축소 모두 지원)
+    - bbox를 캔버스 경계 내로 클램핑 (제품 잘림 방지)
     - 영역 중앙 정렬
     - PNG 투명 배경 지원
     """
     img = image.copy().convert("RGBA")
     product_rgba = product.convert("RGBA")
 
-    # 비율 유지로 영역 내 최대 크기로 축소
-    product_rgba.thumbnail((width, height), Image.LANCZOS)
+    # bbox를 캔버스 경계 내로 클램핑
+    x = max(0, x)
+    y = max(0, y)
+    width = min(width, img.width - x)
+    height = min(height, img.height - y)
+    if width <= 0 or height <= 0:
+        return img
 
+    # 비율 유지 스케일 계산 (thumbnail과 달리 확대도 지원)
     pw, ph = product_rgba.size
-    paste_x = x + (width - pw) // 2
-    paste_y = y + (height - ph) // 2
+    scale = min(width / pw, height / ph)
+    new_w = max(1, round(pw * scale))
+    new_h = max(1, round(ph * scale))
+    product_rgba = product_rgba.resize((new_w, new_h), Image.LANCZOS)
+
+    paste_x = x + (width - new_w) // 2
+    paste_y = y + (height - new_h) // 2
 
     img.paste(product_rgba, (paste_x, paste_y), mask=product_rgba.split()[3])
     return img

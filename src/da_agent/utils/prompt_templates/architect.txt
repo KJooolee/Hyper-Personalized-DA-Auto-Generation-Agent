@@ -57,6 +57,18 @@ Write compelling Korean copy that strictly follows:
 - Must NOT contain any forbidden words: {guidelines_forbidden}
 - Must include required phrases: {guidelines_required}
 
+#### STRICT COPY RULES — Reference Keywords
+Reference Keywords ({copy_keywords}) are extracted from OTHER ads the user clicked.
+They define TONE and WRITING STYLE only — never copy them literally.
+
+**FORBIDDEN**: Do NOT use any of the following unless explicitly listed in product_features or brand_identity:
+- Specific prices or amounts (예: "800원", "무료", "$X")
+- Discount percentages or deals (예: "65%", "반값", "할인", "특가")
+- Time-pressure or scarcity claims (예: "오늘만", "한정", "마감", "D-day")
+- Any promotional claim not present in {product_features}
+
+Copy MUST accurately describe {product_name} as given — do NOT invent benefits or promotions.
+
 ### 2. Image Generation Prompt (English, for FLUX.1)
 
 CRITICAL — The real product photo will be composited SEPARATELY as a PNG on top of the generated image.
@@ -88,6 +100,21 @@ Build a detailed English prompt that includes:
 - Surface / ground area appropriate for product_position "{layout_product_position}"
 - Photo quality descriptors: professional advertising photography, 8K, ultra-sharp, studio-grade
 - Do NOT include any text, typography, or UI elements (added via post-processing)
+
+#### Product-Category Scene Guide
+Read {product_name} and {product_description} to determine the correct scene type.
+Use ONLY ONE of the following scene environments — choose the most relevant:
+
+- **Footwear / Sportswear / Athletic gear**: Dark carbon-textured surface, dramatic single-source rim lighting from upper-left, subtle dynamic speed lines or motion blur in background, empty matte rubber or track-texture ground plane — NO shoes or clothing objects
+- **Skincare / Beauty / Cosmetics**: Soft cream or off-white background, diffused natural window light, organic marble or linen surface texture, faint moisture/dew atmosphere — NO bottles or packaging objects
+- **Food / Beverage**: Rustic dark wood or slate surface, warm amber side-lighting, moody shallow depth-of-field background blur, subtle steam or condensation — NO food items in scene
+- **Electronics / Tech / Gadgets**: Deep charcoal seamless gradient, edge LED rim light creating glow on surface, glossy minimal surface with faint reflection, premium tech aesthetic — NO devices or screens
+- **Fashion / Apparel / Accessories**: Clean editorial studio, directional key light matching brand color tone, smooth gradient seamless backdrop, one-color accent surface — NO clothing or accessories
+- **Health / Wellness / Supplements**: Natural light background with soft plant or nature bokeh, clean minimal surface, fresh cool-toned atmosphere — NO pills or products
+- **Default (if none match)**: Premium studio backdrop using gradient from {brand_primary_colors}, professional four-point lighting rig, clean shadow gradient on ground
+
+IMPORTANT: The scene must make sense as an environment WHERE THE PRODUCT WOULD BE SHOWCASED.
+Generate a UNIQUE composition — vary the angle, depth, and color treatment each time.
 
 ### 3. Layout Guide
 Based on layout type "{layout_type}", specify bounding boxes for a {image_width}x{image_height} canvas.

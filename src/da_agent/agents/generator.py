@@ -14,6 +14,7 @@ from da_agent.utils.image_utils import (
     overlay_logo,
     overlay_product,
     overlay_text,
+    remove_background,
 )
 
 _TEXT_GAP = 10   # 텍스트 요소 간 세로 간격 (px)
@@ -44,6 +45,7 @@ async def generate_ad_image(
     # 2. 실제 제품 이미지 합성 (AI가 그린 가상 제품 대신 원본 사용)
     if product_image_url:
         product_img = await load_image(product_image_url)
+        product_img = remove_background(product_img)  # 배경 자동 제거 → 투명 PNG
         composed = overlay_product(
             base_image,
             product=product_img,

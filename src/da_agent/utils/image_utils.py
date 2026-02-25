@@ -6,6 +6,7 @@ from pathlib import Path
 
 import httpx
 from PIL import Image, ImageDraw, ImageFont
+from rembg import new_session, remove as rembg_remove
 
 # 한글 폰트 경로 — 프로젝트 루트 기준 assets/fonts/
 _FONT_DIR = Path(__file__).parent.parent.parent.parent / "assets/fonts"
@@ -136,6 +137,19 @@ def overlay_text(
         draw.text((x, line_y), line, font=font, fill=color)
 
     return img
+
+
+# rembg 세션은 프로세스 당 한 번만 생성 (모델 재로드 방지)
+_rembg_session = new_session("u2net")
+
+
+def remove_background(image: Image.Image) -> Image.Image:
+    """제품 이미지의 배경을 자동으로 제거하여 투명 PNG로 반환합니다.
+
+    u2net 모델을 사용하며, 첫 실행 시 모델을 다운로드합니다 (~170MB).
+    이후 실행은 캐시에서 즉시 로드됩니다.
+    """
+    return rembg_remove(image, session=_rembg_session)
 
 
 def overlay_product(

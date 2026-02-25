@@ -14,6 +14,7 @@ dependencies = [
     "pillow>=10.0.0",
     "fal-client>=0.4.0",
     "replicate>=0.30.0",
+    "rembg[cpu]>=2.0.72",
 ]
 
 [project.optional-dependencies]

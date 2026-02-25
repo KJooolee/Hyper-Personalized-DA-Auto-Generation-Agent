@@ -151,7 +151,16 @@ async def generate_ad_image(
     # 4. 헤드라인 + 서브카피 오버레이
     text_x = lg.text_bbox.x + _TEXT_ZONE_PADDING_SIDE
     text_y = lg.text_bbox.y + _TEXT_ZONE_PADDING_TOP
-    max_w = lg.text_bbox.width - _TEXT_ZONE_PADDING_SIDE * 2
+
+    # max_w는 ① text_bbox 내부 너비, ② 캔버스 오른쪽 경계까지 남은 거리 중 작은 값으로 클램핑
+    # → architect가 text_bbox.x + text_bbox.width > canvas_w를 잘못 생성해도 텍스트 우측 잘림 방지
+    max_w = max(
+        50,
+        min(
+            lg.text_bbox.width - _TEXT_ZONE_PADDING_SIDE * 2,
+            canvas_w - text_x - _TEXT_ZONE_PADDING_SIDE,
+        ),
+    )
 
     # 가로형 배너에서는 폰트를 줄여서 좁은 높이에 맞춤
     headline_size = 32 if banner else 52

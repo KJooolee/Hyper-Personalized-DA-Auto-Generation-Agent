@@ -92,15 +92,32 @@ Build a detailed English prompt that includes:
 ### 3. Layout Guide
 Based on layout type "{layout_type}", specify bounding boxes for a {image_width}x{image_height} canvas.
 
-CRITICAL layout rules:
-- product_bbox, text_bbox, logo_bbox must NOT overlap each other
-- text_bbox height must be LARGE ENOUGH to fit all three copy elements WITHOUT clipping:
-  - headline at ~60px per line (font 52px)
-  - subheadline at ~44px per line (font 32px)
-  - CTA at ~38px (font 28px, single line)
-  - Add 36px padding between elements → minimum text_bbox height = (headline_lines × 60) + (sub_lines × 44) + 38 + 72
+CRITICAL layout rules — follow these EXACTLY to produce a real-looking Korean display ad:
+
+**Product (the visual hero):**
+- product_bbox must be LARGE — minimum 60% of canvas width AND 55% of canvas height
+- Place the product prominently: center, center-left, or center-right depending on layout_type
+- Example for 1080×1080: product_bbox width ≥ 650px, height ≥ 600px
+
+**Text zone (brand color band at the bottom):**
+- text_bbox MUST be placed in the BOTTOM portion of the canvas
+- text_bbox.y must be at least 60% of canvas height (≥ {image_height} × 0.60)
+- The renderer will draw a FULL-WIDTH solid brand-color band starting at text_bbox.y extending to the bottom
+- text_bbox.width should be at least 70% of canvas width for comfortable reading
+- text_bbox.height must be LARGE ENOUGH to fit all three copy elements WITHOUT clipping:
+  - headline at ~62px per line (font 52px bold)
+  - subheadline at ~42px per line (font 30px)
+  - CTA button: 58px height + 20px gap
+  - Add top padding 28px → minimum text_bbox.height = 28 + (headline_lines × 62) + 12 + (sub_lines × 42) + 20 + 58 + 24
 - Korean headline is typically 12–18 characters → estimate line count based on text_bbox.width
-- logo_bbox: 120×60 px is a safe default; place in a corner that does not conflict
+
+**Logo:**
+- logo_bbox: 140×70 px; place in the top-left or top-right corner of the canvas (y ≤ 40)
+- logo must NOT overlap with text_bbox
+
+**Non-overlap check:**
+- product_bbox and text_bbox may vertically overlap at the boundary (product can bleed into the top of the text zone)
+- But text_bbox and logo_bbox must NOT overlap
 
 Respond ONLY with valid JSON matching this exact structure:
 {{

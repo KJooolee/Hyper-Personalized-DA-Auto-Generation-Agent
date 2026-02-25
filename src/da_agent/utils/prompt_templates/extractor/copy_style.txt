@@ -7,7 +7,7 @@ Focus exclusively on the copy/text elements:
 - Tone and manner of the writing style
 - Copy length category
 - Primary emphasis/persuasion approach
-- Key emotional or thematic keywords present in the copy
+- Key emotional or thematic STYLE keywords (see strict rules below)
 
 Tone examples (Korean advertising styles):
 - "감성적 서술형" (emotional narrative)
@@ -32,6 +32,26 @@ Length categories:
 - "medium": 16-30 characters or words
 - "long": 30+ characters or words
 
+### STRICT KEYWORD RULES
+
+Keywords must capture ONLY the abstract writing STYLE and emotional TONE.
+They will be applied to a completely different product — never use product-specific terms.
+
+FORBIDDEN in keywords — NEVER include:
+- Specific prices or amounts (e.g., "800원", "1,000원", "무료", "$10")
+- Discount percentages or ratios (e.g., "65%", "50% OFF", "반값")
+- Promotional/time-pressure terms (e.g., "오늘만", "한정", "특가", "이벤트", "D-day", "마감")
+- Brand names or product names visible in the ad
+- Any numeric value that relates to pricing or promotions
+
+ALLOWED in keywords — ONLY include:
+- Emotional tone words (e.g., "도전", "자연스러운", "편안함", "활력", "설렘")
+- Narrative/call-to-action style patterns (e.g., "지금 시작", "새롭게", "경험하다")
+- Abstract value propositions (e.g., "프리미엄", "일상의 변화", "나만의 선택")
+- Sensory or mood descriptors (e.g., "청량한", "따뜻한", "역동적인")
+
+If no suitable abstract keywords can be extracted, return an empty array [].
+
 If text is partially obscured or unclear, infer from what is visible.
 If no text is visible, return empty strings and empty arrays.
 
@@ -40,5 +60,5 @@ Respond ONLY with valid JSON matching this exact structure:
   "tone": "Korean advertising tone description",
   "length": "ultra-short|short|medium|long",
   "emphasis_type": "primary emphasis approach",
-  "keywords": ["keyword1", "keyword2", "keyword3"]
+  "keywords": ["abstract_style_keyword1", "abstract_style_keyword2"]
 }

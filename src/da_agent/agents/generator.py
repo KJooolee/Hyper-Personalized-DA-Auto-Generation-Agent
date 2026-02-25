@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import os
 import re
 
@@ -76,49 +75,35 @@ def _brand_cta_color(brand_identity: dict) -> tuple[int, int, int, int]:
     return (r, g, b, 255)
 
 
-async def _get_fal_image_url(path_or_url: str) -> str:
-    """로컬 파일 경로 또는 URL을 fal 이미지 생성 API에 전달 가능한 URL로 변환합니다.
-
-    - HTTP(S) URL → 그대로 반환
-    - 로컬 파일 → fal CDN에 업로드 후 URL 반환
-    """
-    if path_or_url.startswith(("http://", "https://")):
-        return path_or_url
-    # fal_client.upload_file은 동기 함수이므로 스레드 풀에서 실행
-    return await asyncio.to_thread(fal_client.upload_file, path_or_url)
-
-
 async def generate_ad_image(
     blueprint: Blueprint,
     brand_identity: dict,
     product_image_url: str | None = None,
-    reference_image_url: str | None = None,
 ) -> tuple[Image.Image, bytes]:
     """Stage 3: Blueprint를 바탕으로 최종 광고 이미지를 생성·합성합니다.
 
     레이어 순서:
-      1) FLUX.1 배경 이미지 생성 (레퍼런스 이미지 제공 시 img2img 사용)
-      2) 제품 이미지 합성 (배경 제거 후)
+      1) FLUX.1 배경 이미지 생성 (txt2img)
+      2) 제품 이미지 합성 (배경 제거 후, 확대·축소 + 캔버스 클램핑)
       3) 텍스트 존 컬러 밴드
          - 가로형 배너: text_bbox.x부터 우측 끝까지 세로 밴드
          - 정사각형/세로형: text_bbox.y부터 하단 끝까지 가로 밴드
-      4) 헤드라인 + 서브카피 텍스트
-      5) CTA 버튼 (둥근 사각형)
+      4) 헤드라인 + 서브카피 텍스트 (캔버스 오버플로 방지)
+      5) CTA 버튼 (캔버스 오버플로 방지)
       6) 브랜드 로고 합성
 
     Args:
         blueprint: 설계도 (카피, 이미지 프롬프트, 레이아웃 가이드)
         brand_identity: 브랜드 아이덴티티 (로고 URL, 컬러)
         product_image_url: 실제 제품 이미지 경로/URL
-        reference_image_url: 스타일 레퍼런스 이미지 경로/URL (img2img에 사용)
 
     Returns:
         (PIL Image, PNG bytes)
     """
     settings = get_settings()
 
-    # 1. 배경 이미지 생성 (레퍼런스 이미지 있으면 img2img, 없으면 txt2img)
-    base_image = await _generate_base_image(blueprint, settings, reference_image_url)
+    # 1. 배경 이미지 생성 (txt2img)
+    base_image = await _generate_base_image(blueprint, settings)
     canvas_w, canvas_h = base_image.size
     lg = blueprint.layout_guide
     banner = _is_horizontal_banner(canvas_w, canvas_h)
@@ -174,53 +159,59 @@ async def generate_ad_image(
     cta_size = 18 if banner else 26
     cta_btn_h = 36 if banner else _CTA_BTN_HEIGHT
 
-    composed = overlay_text(
-        composed,
-        text=blueprint.ad_copy.headline,
-        x=text_x,
-        y=text_y,
-        max_width=max_w,
-        font_size=headline_size,
-        bold=True,
-        color=(255, 255, 255, 255),
-        shadow=False,
-    )
+    # 캔버스 높이를 넘지 않는 경우만 렌더링
+    if text_y < canvas_h:
+        composed = overlay_text(
+            composed,
+            text=blueprint.ad_copy.headline,
+            x=text_x,
+            y=text_y,
+            max_width=max_w,
+            font_size=headline_size,
+            bold=True,
+            color=(255, 255, 255, 255),
+            shadow=False,
+        )
     headline_h = measure_text_height(
         blueprint.ad_copy.headline, max_w, font_size=headline_size, bold=True
     )
 
     sub_y = text_y + headline_h + _TEXT_GAP
-    composed = overlay_text(
-        composed,
-        text=blueprint.ad_copy.subheadline,
-        x=text_x,
-        y=sub_y,
-        max_width=max_w,
-        font_size=sub_size,
-        bold=False,
-        color=(210, 210, 210, 220),
-        shadow=False,
-    )
+    if sub_y < canvas_h:
+        composed = overlay_text(
+            composed,
+            text=blueprint.ad_copy.subheadline,
+            x=text_x,
+            y=sub_y,
+            max_width=max_w,
+            font_size=sub_size,
+            bold=False,
+            color=(210, 210, 210, 220),
+            shadow=False,
+        )
     sub_h = measure_text_height(
         blueprint.ad_copy.subheadline, max_w, font_size=sub_size, bold=False
     )
 
-    # 5. CTA 버튼
+    # 5. CTA 버튼 — 캔버스 하단을 넘지 않도록 y 클램핑
     cta_btn_w = min(_CTA_BTN_MAX_WIDTH, max_w)
     cta_btn_x = text_x
     cta_btn_y = sub_y + sub_h + _CTA_GAP
-    cta_color = _brand_cta_color(brand_identity)
-    composed = overlay_cta_button(
-        composed,
-        text=blueprint.ad_copy.cta,
-        x=cta_btn_x,
-        y=cta_btn_y,
-        width=cta_btn_w,
-        height=cta_btn_h,
-        bg_color=cta_color,
-        text_color=(255, 255, 255, 255),
-        font_size=cta_size,
-    )
+    cta_btn_y = min(cta_btn_y, canvas_h - cta_btn_h - 4)  # 캔버스 밖으로 밀려나지 않도록
+
+    if cta_btn_y >= 0 and cta_btn_y + cta_btn_h <= canvas_h:
+        cta_color = _brand_cta_color(brand_identity)
+        composed = overlay_cta_button(
+            composed,
+            text=blueprint.ad_copy.cta,
+            x=cta_btn_x,
+            y=cta_btn_y,
+            width=cta_btn_w,
+            height=cta_btn_h,
+            bg_color=cta_color,
+            text_color=(255, 255, 255, 255),
+            font_size=cta_size,
+        )
 
     # 6. 브랜드 로고 합성
     logo_url = brand_identity.get("logo_url")
@@ -238,49 +229,29 @@ async def generate_ad_image(
     return composed, image_to_bytes(composed)
 
 
-async def _generate_base_image(
-    blueprint: Blueprint,
-    settings,
-    reference_image_url: str | None = None,
-) -> Image.Image:
-    """FLUX.1 [dev] API로 배경 이미지를 생성합니다.
+async def _generate_base_image(blueprint: Blueprint, settings) -> Image.Image:
+    """FLUX.1 [dev] API로 배경 이미지를 생성합니다 (txt2img).
 
-    - reference_image_url 제공 시: img2img (fal-ai/flux/dev/image-to-image)
-    - 미제공 시: txt2img (fal-ai/flux/dev)
-
-    img2img strength=0.85: 프롬프트를 80% 이상 따르되 레퍼런스 스타일이 자연스럽게 녹아듦
+    image_prompt는 architect가 제품 카테고리와 브랜드 무드에 맞게 생성합니다.
+    배경에 제품·텍스트·UI 요소가 포함되지 않도록 architect.txt에서 엄격히 제한합니다.
     """
     if settings.fal_key:
         os.environ["FAL_KEY"] = settings.fal_key
 
-    image_size = {
-        "width": settings.image_width,
-        "height": settings.image_height,
-    }
-    common_args = {
-        "prompt": blueprint.image_prompt,
-        "image_size": image_size,
-        "num_inference_steps": 28,
-        "guidance_scale": 3.5,
-        "num_images": 1,
-        "enable_safety_checker": True,
-    }
-
-    if reference_image_url:
-        fal_ref_url = await _get_fal_image_url(reference_image_url)
-        result = await fal_client.run_async(
-            "fal-ai/flux/dev/image-to-image",
-            arguments={
-                **common_args,
-                "image_url": fal_ref_url,
-                "strength": 0.85,  # 0=레퍼런스 복사, 1=완전 새 이미지 → 0.85는 스타일만 참고
+    result = await fal_client.run_async(
+        settings.image_gen_model,
+        arguments={
+            "prompt": blueprint.image_prompt,
+            "image_size": {
+                "width": settings.image_width,
+                "height": settings.image_height,
             },
-        )
-    else:
-        result = await fal_client.run_async(
-            settings.image_gen_model,
-            arguments=common_args,
-        )
+            "num_inference_steps": 28,
+            "guidance_scale": 3.5,
+            "num_images": 1,
+            "enable_safety_checker": True,
+        },
+    )
 
     image_url = result["images"][0]["url"]
     return await load_image(image_url)

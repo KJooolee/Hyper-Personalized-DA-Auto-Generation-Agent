@@ -56,6 +56,13 @@ async def run_pipeline(
     settings = get_settings()
     product_info = {**product_info, "image_url": product_image}
 
+    # 클릭 광고 이미지 중 첫 번째를 img2img 스타일 레퍼런스로 사용
+    reference_image = (
+        user_clicked_ad_image[0]
+        if isinstance(user_clicked_ad_image, list)
+        else user_clicked_ad_image
+    )
+
     # ── Stage 1: 병렬 스타일 DNA 추출 ───────────────────────────────────────
     logger.info("Stage 1: extracting style DNA from user-clicked ad...")
     style_dna = await extract_style_dna(user_clicked_ad_image)
@@ -88,6 +95,7 @@ async def run_pipeline(
             blueprint,
             brand_identity,
             product_image_url=product_info.get("image_url"),
+            reference_image_url=reference_image,  # 클릭 광고를 스타일 레퍼런스로 전달
         )
 
         # Stage 4: 가이드라인 적합성 평가 (이중 검증: Vision + 텍스트 직접)

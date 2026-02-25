@@ -92,32 +92,58 @@ Build a detailed English prompt that includes:
 ### 3. Layout Guide
 Based on layout type "{layout_type}", specify bounding boxes for a {image_width}x{image_height} canvas.
 
-CRITICAL layout rules — follow these EXACTLY to produce a real-looking Korean display ad:
+CRITICAL layout rules — follow these EXACTLY to produce a real-looking Korean display ad.
 
-**Product (the visual hero):**
+First, determine the canvas orientation:
+- **Horizontal banner** (width > height × 2.5, e.g., {image_width}×{image_height} = {image_width}÷{image_height} ratio): use Side-by-Side layout
+- **Square / portrait** (width ≤ height × 2.5): use Stacked layout
+
+---
+
+### Horizontal Banner Layout (Side-by-Side) — use when {image_width} > {image_height} × 2.5
+
+**Product zone (left side):**
+- product_bbox: x=0, y=0, width = ~35–40% of canvas width, height = canvas height
+- Example for 1660×260: product_bbox ≈ {{ x:0, y:0, width:580, height:260 }}
+
+**Text zone (right side):**
+- text_bbox.x = product_bbox.width (immediately right of product)
+- text_bbox.y = 0
+- text_bbox.width = canvas width - product_bbox.width - logo_bbox.width - 20
+- text_bbox.height = canvas height
+- The renderer will draw a FULL-HEIGHT vertical brand-color band from text_bbox.x to the right edge
+- Text elements are stacked vertically; use SMALL fonts (headline ~32px, sub ~20px, CTA button ~18px)
+- Minimum text_bbox.width check: headline at ~20px/char → ensure width ≥ headline_chars × 20
+
+**Logo zone:**
+- logo_bbox: width=120, height=50; place at the RIGHT EDGE, vertically centered
+- logo_bbox.x = canvas_width - 130, logo_bbox.y = (canvas_height - 50) // 2
+
+---
+
+### Square / Portrait Layout (Stacked) — use when {image_width} ≤ {image_height} × 2.5
+
+**Product zone (upper area):**
 - product_bbox must be LARGE — minimum 60% of canvas width AND 55% of canvas height
-- Place the product prominently: center, center-left, or center-right depending on layout_type
-- Example for 1080×1080: product_bbox width ≥ 650px, height ≥ 600px
+- Place the product prominently: center, center-left, or center-right
+- Example for 1080×1080: product_bbox ≈ {{ x:180, y:20, width:720, height:640 }}
 
-**Text zone (brand color band at the bottom):**
-- text_bbox MUST be placed in the BOTTOM portion of the canvas
+**Text zone (bottom area):**
 - text_bbox.y must be at least 60% of canvas height (≥ {image_height} × 0.60)
-- The renderer will draw a FULL-WIDTH solid brand-color band starting at text_bbox.y extending to the bottom
-- text_bbox.width should be at least 70% of canvas width for comfortable reading
-- text_bbox.height must be LARGE ENOUGH to fit all three copy elements WITHOUT clipping:
-  - headline at ~62px per line (font 52px bold)
-  - subheadline at ~42px per line (font 30px)
-  - CTA button: 58px height + 20px gap
-  - Add top padding 28px → minimum text_bbox.height = 28 + (headline_lines × 62) + 12 + (sub_lines × 42) + 20 + 58 + 24
+- text_bbox.x = 40, text_bbox.width = canvas_width - 80
+- The renderer will draw a FULL-WIDTH horizontal brand-color band from text_bbox.y to the bottom
+- text_bbox.height must fit: 28 + (headline_lines × 62) + 12 + (sub_lines × 42) + 16 + 58 + 24
 - Korean headline is typically 12–18 characters → estimate line count based on text_bbox.width
 
-**Logo:**
-- logo_bbox: 140×70 px; place in the top-left or top-right corner of the canvas (y ≤ 40)
-- logo must NOT overlap with text_bbox
+**Logo zone:**
+- logo_bbox: 140×70 px; top-left or top-right corner (y ≤ 40)
+- Must NOT overlap with text_bbox
 
-**Non-overlap check:**
-- product_bbox and text_bbox may vertically overlap at the boundary (product can bleed into the top of the text zone)
-- But text_bbox and logo_bbox must NOT overlap
+---
+
+**Non-overlap rule:**
+- product_bbox and text_bbox boundary may touch (product can visually bleed into text zone top)
+- text_bbox and logo_bbox must NOT overlap
 
 Respond ONLY with valid JSON matching this exact structure:
 {{

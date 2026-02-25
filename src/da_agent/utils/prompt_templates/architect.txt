@@ -59,6 +59,12 @@ Write compelling Korean copy that strictly follows:
 
 ### 2. Image Generation Prompt (English, for FLUX.1)
 
+CRITICAL — The real product photo will be composited SEPARATELY as a PNG on top of the generated image.
+Therefore, generate a BACKGROUND SCENE ONLY:
+- NO shoes, NO products, NO objects in the product area — leave it as a clean, photogenic surface
+- The product zone (product_bbox) must have a simple, uncluttered background with appropriate lighting so the real product photo blends naturally
+- Think of the image as a professional advertising backdrop — dramatic mood, strong brand colors, striking composition, but empty product pedestal
+
 CRITICAL — Korean aesthetic to English visual translation guide:
 Apply this translation when the user's aesthetic includes Korean-specific mood words:
 
@@ -75,17 +81,26 @@ Apply this translation when the user's aesthetic includes Korean-specific mood w
 | 청량한 | bright airy atmosphere, high-key lighting, fresh cool tones, open sky |
 
 Build a detailed English prompt that includes:
-- Lighting: {image_lighting}
+- BACKGROUND ONLY — no product or objects; clean open space where the product will be composited
+- Lighting: {image_lighting} that creates a natural shadow/highlight for a product placed in the scene
 - Mood: translate "{image_mood}" using the guide above if applicable
-- Brand colors prominently: {brand_primary_colors}
-- Product presentation style matching "{layout_product_position}"
-- Background matching the aesthetic
-- Photo quality descriptors (e.g., professional product photography, 4K, sharp focus)
-- Do NOT include any text/typography in the prompt (text is added via post-processing)
+- Brand colors prominently integrated in background: {brand_primary_colors}
+- Surface / ground area appropriate for product_position "{layout_product_position}"
+- Photo quality descriptors: professional advertising photography, 8K, ultra-sharp, studio-grade
+- Do NOT include any text, typography, or UI elements (added via post-processing)
 
 ### 3. Layout Guide
 Based on layout type "{layout_type}", specify bounding boxes for a {image_width}x{image_height} canvas.
-Ensure product, text, and logo regions do not overlap.
+
+CRITICAL layout rules:
+- product_bbox, text_bbox, logo_bbox must NOT overlap each other
+- text_bbox height must be LARGE ENOUGH to fit all three copy elements WITHOUT clipping:
+  - headline at ~60px per line (font 52px)
+  - subheadline at ~44px per line (font 32px)
+  - CTA at ~38px (font 28px, single line)
+  - Add 36px padding between elements → minimum text_bbox height = (headline_lines × 60) + (sub_lines × 44) + 38 + 72
+- Korean headline is typically 12–18 characters → estimate line count based on text_bbox.width
+- logo_bbox: 120×60 px is a safe default; place in a corner that does not conflict
 
 Respond ONLY with valid JSON matching this exact structure:
 {{

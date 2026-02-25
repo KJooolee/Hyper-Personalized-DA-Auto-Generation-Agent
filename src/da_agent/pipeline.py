@@ -82,9 +82,13 @@ async def run_pipeline(
         )
         logger.info("Blueprint ad_copy: %s", blueprint.ad_copy.model_dump())
 
-        # Stage 3: 이미지 생성 + 카피/로고 합성
+        # Stage 3: 이미지 생성 + 실제 제품 합성 + 카피/로고 합성
         logger.info("Stage 3: generating ad image...")
-        generated_image, image_bytes = await generate_ad_image(blueprint, brand_identity)
+        generated_image, image_bytes = await generate_ad_image(
+            blueprint,
+            brand_identity,
+            product_image_url=product_info.get("image_url"),
+        )
 
         # Stage 4: 가이드라인 적합성 평가 (이중 검증: Vision + 텍스트 직접)
         logger.info("Stage 4: evaluating ad against guidelines...")

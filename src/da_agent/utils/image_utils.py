@@ -6,6 +6,7 @@ from pathlib import Path
 
 import httpx
 from PIL import Image, ImageDraw, ImageFont
+from rembg import new_session, remove as rembg_remove
 
 # 한글 폰트 경로 — 프로젝트 루트 기준 assets/fonts/
 _FONT_DIR = Path(__file__).parent.parent.parent.parent / "assets/fonts"
@@ -63,6 +64,39 @@ async def load_image(path_or_url: str) -> Image.Image:
     return Image.open(path_or_url).convert("RGBA")
 
 
+def _wrap_text(text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list[str]:
+    """한글 텍스트를 max_width에 맞게 자동 줄바꿈합니다."""
+    lines: list[str] = []
+    current_line = ""
+    for char in text:
+        test_line = current_line + char
+        bbox = font.getbbox(test_line)
+        if bbox[2] - bbox[0] <= max_width:
+            current_line = test_line
+        else:
+            if current_line:
+                lines.append(current_line)
+            current_line = char
+    if current_line:
+        lines.append(current_line)
+    return lines
+
+
+def measure_text_height(
+    text: str,
+    max_width: int,
+    font_size: int,
+    bold: bool = False,
+    line_spacing: int = 8,
+) -> int:
+    """텍스트가 렌더링될 총 높이(px)를 계산합니다 (실제 렌더링 없음)."""
+    font = _load_korean_font(font_size, bold=bold)
+    lines = _wrap_text(text, font, max_width)
+    char_h = font.getbbox("가")
+    line_height = (char_h[3] - char_h[1]) + line_spacing
+    return len(lines) * line_height
+
+
 def overlay_text(
     image: Image.Image,
     text: str,
@@ -73,35 +107,76 @@ def overlay_text(
     bold: bool = False,
     color: tuple[int, int, int, int] = (255, 255, 255, 255),
     line_spacing: int = 8,
+    shadow: bool = True,
+    shadow_color: tuple[int, int, int, int] = (0, 0, 0, 180),
+    shadow_offset: int = 2,
 ) -> Image.Image:
-    """이미지에 한글 텍스트를 오버레이합니다. 자동 줄바꿈을 지원합니다."""
+    """이미지에 한글 텍스트를 오버레이합니다.
+
+    - 자동 줄바꿈 (max_width 기준)
+    - 선택적 드롭 섀도우로 가독성 향상
+    """
     img = image.copy()
     draw = ImageDraw.Draw(img)
     font = _load_korean_font(font_size, bold=bold)
 
-    # 자동 줄바꿈: max_width를 초과하면 줄바꿈
-    words = list(text)  # 한글은 글자 단위로 처리
-    lines: list[str] = []
-    current_line = ""
+    lines = _wrap_text(text, font, max_width)
 
-    for char in words:
-        test_line = current_line + char
-        bbox = font.getbbox(test_line)
-        line_width = bbox[2] - bbox[0]
-        if line_width <= max_width:
-            current_line = test_line
-        else:
-            if current_line:
-                lines.append(current_line)
-            current_line = char
-    if current_line:
-        lines.append(current_line)
+    char_h = font.getbbox("가")
+    line_height = (char_h[3] - char_h[1]) + line_spacing
 
-    # 각 줄 렌더링
-    line_height = font.getbbox("가")[3] + line_spacing
     for i, line in enumerate(lines):
-        draw.text((x, y + i * line_height), line, font=font, fill=color)
+        line_y = y + i * line_height
+        if shadow:
+            draw.text(
+                (x + shadow_offset, line_y + shadow_offset),
+                line,
+                font=font,
+                fill=shadow_color,
+            )
+        draw.text((x, line_y), line, font=font, fill=color)
 
+    return img
+
+
+# rembg 세션은 프로세스 당 한 번만 생성 (모델 재로드 방지)
+_rembg_session = new_session("u2net")
+
+
+def remove_background(image: Image.Image) -> Image.Image:
+    """제품 이미지의 배경을 자동으로 제거하여 투명 PNG로 반환합니다.
+
+    u2net 모델을 사용하며, 첫 실행 시 모델을 다운로드합니다 (~170MB).
+    이후 실행은 캐시에서 즉시 로드됩니다.
+    """
+    return rembg_remove(image, session=_rembg_session)
+
+
+def overlay_product(
+    image: Image.Image,
+    product: Image.Image,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+) -> Image.Image:
+    """실제 제품 이미지를 지정 영역(product_bbox)에 합성합니다.
+
+    - 비율 유지 리사이즈 (contain)
+    - 영역 중앙 정렬
+    - PNG 투명 배경 지원
+    """
+    img = image.copy().convert("RGBA")
+    product_rgba = product.convert("RGBA")
+
+    # 비율 유지로 영역 내 최대 크기로 축소
+    product_rgba.thumbnail((width, height), Image.LANCZOS)
+
+    pw, ph = product_rgba.size
+    paste_x = x + (width - pw) // 2
+    paste_y = y + (height - ph) // 2
+
+    img.paste(product_rgba, (paste_x, paste_y), mask=product_rgba.split()[3])
     return img
 
 

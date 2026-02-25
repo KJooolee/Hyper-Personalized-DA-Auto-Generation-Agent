@@ -6,10 +6,15 @@
 실제 운영 시에는 아래 example_* 변수를 교체하여 사용.
 """
 import asyncio
+import datetime
 import logging
+<<<<<<< HEAD
 import os
 import urllib.request
 from datetime import datetime
+=======
+import pathlib
+>>>>>>> 20d1813e6a11bc7f977dd6d46ad35114edcc996f
 
 from da_agent.utils.http_client import configure_ssl_globally
 
@@ -49,8 +54,19 @@ async def main() -> None:
         guidelines=example_guidelines,
     )
 
+<<<<<<< HEAD
+=======
+    # 결과 이미지를 output/ 폴더에 저장
+    out_dir = pathlib.Path("output")
+    out_dir.mkdir(exist_ok=True)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_path = out_dir / f"ad_{timestamp}.png"
+    result.final_image.save(out_path)
+
+>>>>>>> 20d1813e6a11bc7f977dd6d46ad35114edcc996f
     print(f"\n✓ 완료: {result.iterations_used}회 시도, 최종 점수 {result.eval_result.score}/100")
     print(f"  Pass: {result.eval_result.passed}")
+    print(f"  저장 위치: {out_path.resolve()}")
     if result.eval_result.issues:
         print("  남은 이슈:")
         for issue in result.eval_result.issues:

@@ -3,8 +3,8 @@ from pathlib import Path
 
 from da_agent.config import get_settings
 from da_agent.models.style_dna import ImageStyle
-from da_agent.utils.http_client import create_openai_client
-from da_agent.utils.image_utils import prepare_image_for_api
+from da_agent.utils.http_client import create_anthropic_client
+from da_agent.utils.image_utils import prepare_image_for_anthropic
 
 _TEMPLATE_PATH = (
     Path(__file__).parent.parent.parent
@@ -15,31 +15,24 @@ _TEMPLATE_PATH = (
 async def extract_image_style(image_url: str) -> ImageStyle:
     """Stage 1a: 광고 이미지에서 시각적 스타일(분위기·조명·색감)을 추출합니다."""
     settings = get_settings()
-    client = create_openai_client()
+    client = create_anthropic_client()
     system_prompt = _TEMPLATE_PATH.read_text(encoding="utf-8")
-    api_image_url = prepare_image_for_api(image_url)
+    image_block = prepare_image_for_anthropic(image_url)
 
-    response = await client.chat.completions.create(
+    response = await client.messages.create(
         model=settings.stage1_model,
+        system=system_prompt,
         messages=[
-            {"role": "system", "content": system_prompt},
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": api_image_url, "detail": "high"},
-                    },
-                    {
-                        "type": "text",
-                        "text": "Extract the image style from this ad.",
-                    },
+                    image_block,
+                    {"type": "text", "text": "Extract the image style from this ad."},
                 ],
-            },
+            }
         ],
-        response_format={"type": "json_object"},
         max_tokens=512,
     )
 
-    raw = json.loads(response.choices[0].message.content)
+    raw = json.loads(response.content[0].text)
     return ImageStyle(**raw)

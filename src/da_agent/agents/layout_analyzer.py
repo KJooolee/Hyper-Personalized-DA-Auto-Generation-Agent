@@ -5,31 +5,22 @@ LLM이 좌표를 상상하는 대신 실제 이미지를 분석하므로 배치 
 """
 from __future__ import annotations
 
-import base64
 import json
 import logging
-from io import BytesIO
 from pathlib import Path
 
 from PIL import Image
 
 from da_agent.config import get_settings
 from da_agent.models.ad_layout import AdLayout
-from da_agent.utils.http_client import create_openai_client
+from da_agent.utils.http_client import create_anthropic_client
+from da_agent.utils.image_utils import pil_to_anthropic_block
 
 logger = logging.getLogger(__name__)
 
 _TEMPLATE_PATH = (
     Path(__file__).parent.parent / "utils/prompt_templates/layout_analyzer.txt"
 )
-
-
-def _image_to_data_url(image: Image.Image) -> str:
-    """PIL Image를 Vision API용 base64 JPEG data URL로 변환합니다."""
-    buf = BytesIO()
-    image.convert("RGB").save(buf, format="JPEG", quality=90)
-    b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-    return f"data:image/jpeg;base64,{b64}"
 
 
 def _clamp_layout(layout: AdLayout, canvas_w: int, canvas_h: int) -> AdLayout:
@@ -58,34 +49,27 @@ async def analyze_ad_layout(image: Image.Image) -> AdLayout:
         AdLayout — text_zone, logo_zone, text_color
     """
     settings = get_settings()
-    client = create_openai_client()
+    client = create_anthropic_client()
     canvas_w, canvas_h = image.size
 
     template = _TEMPLATE_PATH.read_text(encoding="utf-8")
     prompt = template.format(width=canvas_w, height=canvas_h)
 
-    response = await client.chat.completions.create(
-        model=settings.stage1_model,  # gpt-4o-mini (Vision)
+    response = await client.messages.create(
+        model=settings.stage1_model,
         messages=[
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": _image_to_data_url(image),
-                            "detail": "high",
-                        },
-                    },
+                    pil_to_anthropic_block(image),
                     {"type": "text", "text": prompt},
                 ],
             }
         ],
-        response_format={"type": "json_object"},
         max_tokens=512,
     )
 
-    raw = json.loads(response.choices[0].message.content)
+    raw = json.loads(response.content[0].text)
     raw.pop("reasoning", None)  # 모델 필드에 없는 reasoning 제거
     layout = AdLayout(**raw)
     layout = _clamp_layout(layout, canvas_w, canvas_h)

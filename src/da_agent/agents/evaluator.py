@@ -1,4 +1,3 @@
-import base64
 import json
 from pathlib import Path
 
@@ -7,19 +6,12 @@ from PIL import Image
 from da_agent.config import get_settings
 from da_agent.models.blueprint import AdCopy
 from da_agent.models.evaluation import EvaluationResult
-from da_agent.utils.http_client import create_openai_client
-from da_agent.utils.image_utils import image_to_bytes
+from da_agent.utils.http_client import create_anthropic_client
+from da_agent.utils.image_utils import pil_to_anthropic_block
 
 _TEMPLATE_PATH = (
     Path(__file__).parent.parent / "utils/prompt_templates/evaluator.txt"
 )
-
-
-def _image_to_data_url(image: Image.Image) -> str:
-    """PIL Image를 base64 data URL로 변환합니다."""
-    image_bytes = image_to_bytes(image, format="JPEG")
-    b64 = base64.b64encode(image_bytes).decode("utf-8")
-    return f"data:image/jpeg;base64,{b64}"
 
 
 async def evaluate_ad(
@@ -35,7 +27,7 @@ async def evaluate_ad(
     - 텍스트 직접 검사: 금지어·필수 문구·법적 요소 (ad_copy 문자열)
     """
     settings = get_settings()
-    client = create_openai_client()
+    client = create_anthropic_client()
 
     template = _TEMPLATE_PATH.read_text(encoding="utf-8")
     prompt = template.format(
@@ -50,25 +42,19 @@ async def evaluate_ad(
         pass_score=settings.eval_pass_score,
     )
 
-    image_data_url = _image_to_data_url(generated_image)
-
-    response = await client.chat.completions.create(
+    response = await client.messages.create(
         model=settings.stage4_model,
         messages=[
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": image_data_url, "detail": "high"},
-                    },
+                    pil_to_anthropic_block(generated_image),
                     {"type": "text", "text": prompt},
                 ],
             }
         ],
-        response_format={"type": "json_object"},
         max_tokens=1024,
     )
 
-    raw = json.loads(response.choices[0].message.content)
+    raw = json.loads(response.content[0].text)
     return EvaluationResult(**raw)

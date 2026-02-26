@@ -19,9 +19,12 @@ class Settings(BaseSettings):
     replicate_api_token: str = ""
 
     # Model Configuration
-    stage1_model: str = "gpt-4o-mini"
-    stage2_model: str = "gpt-4o"
-    stage4_model: str = "gpt-4o-mini"
+    # Stage 1 (extractor) / Stage 3b (layout analyzer): 빠른 Vision 분석
+    stage1_model: str = "claude-haiku-4-5-20251001"
+    # Stage 2 (architect): 한국어 광고 카피 생성 — 고품질 모델 사용
+    stage2_model: str = "claude-sonnet-4-6"
+    # Stage 4 (evaluator): 가이드라인 적합성 평가
+    stage4_model: str = "claude-haiku-4-5-20251001"
     image_gen_model: str = "fal-ai/flux/dev"
 
     # Pipeline Configuration

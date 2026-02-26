@@ -24,6 +24,36 @@ def _load_korean_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
 
 
 
+def prepare_image_for_anthropic(path_or_url: str) -> dict:
+    """파일 경로/URL을 Anthropic Vision API 이미지 콘텐츠 블록으로 변환합니다.
+
+    - HTTPS/HTTP URL → {"type": "image", "source": {"type": "url", ...}}
+    - 로컬 파일 → base64 인코딩 후 {"type": "image", "source": {"type": "base64", ...}}
+    """
+    if path_or_url.startswith(("http://", "https://")):
+        return {"type": "image", "source": {"type": "url", "url": path_or_url}}
+
+    path = Path(path_or_url)
+    mime_map = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+    }
+    mime = mime_map.get(path.suffix.lower(), "image/jpeg")
+    b64 = base64.b64encode(path.read_bytes()).decode("utf-8")
+    return {"type": "image", "source": {"type": "base64", "media_type": mime, "data": b64}}
+
+
+def pil_to_anthropic_block(image: Image.Image) -> dict:
+    """PIL Image를 Anthropic Vision API 이미지 콘텐츠 블록으로 변환합니다."""
+    buf = io.BytesIO()
+    image.convert("RGB").save(buf, format="JPEG", quality=90)
+    b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    return {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}}
+
+
 def prepare_image_for_api(path_or_url: str) -> str:
     """파일 경로 또는 URL을 OpenAI Vision API가 수락하는 형식으로 변환합니다.
 

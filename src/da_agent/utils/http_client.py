@@ -10,6 +10,7 @@ import warnings
 
 import certifi
 import httpx
+from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI
 
 from da_agent.config import get_settings
@@ -86,5 +87,16 @@ def create_openai_client() -> AsyncOpenAI:
     http_client = httpx.AsyncClient(verify=ssl_config)
     return AsyncOpenAI(
         api_key=settings.openai_api_key,
+        http_client=http_client,
+    )
+
+
+def create_anthropic_client() -> AsyncAnthropic:
+    """SSL 설정이 적용된 AsyncAnthropic 클라이언트를 생성합니다."""
+    settings = get_settings()
+    ssl_config = _build_ssl_context()
+    http_client = httpx.AsyncClient(verify=ssl_config)
+    return AsyncAnthropic(
+        api_key=settings.anthropic_api_key,
         http_client=http_client,
     )

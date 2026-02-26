@@ -1,6 +1,6 @@
 You are an expert Korean advertising creative director and FLUX.1 prompt engineer.
 
-Your task is to create a precise generation blueprint for a hyper-personalized ad image.
+Your task is to create a generation blueprint for a hyper-personalized display ad.
 
 ## User Style Preferences (extracted from clicked ads)
 
@@ -28,7 +28,6 @@ Copy Style:
 Name: {product_name}
 Description: {product_description}
 Key Features: {product_features}
-Product Image URL: {product_image_url}
 
 ## Brand Identity
 
@@ -41,7 +40,6 @@ Logo URL: {brand_logo_url}
 Required Elements: {guidelines_required}
 Forbidden Elements: {guidelines_forbidden}
 Tone Constraints: {guidelines_tone}
-Media Specs: {guidelines_media_specs}
 
 {feedback_section}
 
@@ -50,6 +48,7 @@ Media Specs: {guidelines_media_specs}
 ## Output Requirements
 
 ### 1. Korean Ad Copy
+
 Write compelling Korean copy that strictly follows:
 - Tone: match "{copy_tone}"
 - Length: match "{copy_length}" category
@@ -61,7 +60,7 @@ Write compelling Korean copy that strictly follows:
 Reference Keywords ({copy_keywords}) are extracted from OTHER ads the user clicked.
 They define TONE and WRITING STYLE only — never copy them literally.
 
-**FORBIDDEN**: Do NOT use any of the following unless explicitly listed in product_features or brand_identity:
+**FORBIDDEN**: Do NOT use any of the following unless explicitly listed in product_features:
 - Specific prices or amounts (예: "800원", "무료", "$X")
 - Discount percentages or deals (예: "65%", "반값", "할인", "특가")
 - Time-pressure or scarcity claims (예: "오늘만", "한정", "마감", "D-day")
@@ -69,120 +68,45 @@ They define TONE and WRITING STYLE only — never copy them literally.
 
 Copy MUST accurately describe {product_name} as given — do NOT invent benefits or promotions.
 
-#### Banner Copy Length Limits (applies when {image_width} > {image_height} × 2.5)
-The text zone in a horizontal banner is very narrow in height (~260px).
-Exceeding these limits causes text overflow or awkward one-character orphan lines.
+---
 
-| Element | Max characters | Guideline |
-|---|---|---|
-| headline | **20자** | 1줄 완성 목표, 최대 2줄 (16자 이하 권장) |
-| subheadline | **30자** | 1줄 완성 목표, 최대 2줄 — 절대 3줄 금지 |
-| cta | **10자** | 버튼 안에 들어갈 짧은 문구 |
+### 2. Style Transformation Prompt (English, for FLUX.1 img2img)
 
-**Orphan prevention rule**: 마지막 줄에 혼자 남는 어절이 생기지 않도록 전체 문장 길이를 조정하세요.
+The existing product DA will be **style-transformed** via FLUX.1 img2img.
+The prompt must direct FLUX to change the mood/color/lighting while keeping the product and composition intact.
 
-### 2. Image Generation Prompt (English, for FLUX.1)
+**Prompt structure — follow this template exactly:**
 
-CRITICAL — The real product photo will be composited SEPARATELY as a PNG on top of the generated image.
-Therefore, generate a BACKGROUND SCENE ONLY:
-- NO shoes, NO products, NO objects in the product area — leave it as a clean, photogenic surface
-- The product zone (product_bbox) must have a simple, uncluttered background with appropriate lighting so the real product photo blends naturally
-- Think of the image as a professional advertising backdrop — dramatic mood, strong brand colors, striking composition, but empty product pedestal
+Transform this product advertisement. [STYLE CHANGES]. Preserve the main product shape, position, and overall composition structure. Professional Korean display advertising, 8K, ultra-sharp, no text or UI elements.
 
-CRITICAL — Korean aesthetic to English visual translation guide:
-Apply this translation when the user's aesthetic includes Korean-specific mood words:
+**[STYLE CHANGES] must include:**
+1. **Mood/atmosphere**: Translate "{image_mood}" using the Korean aesthetic guide below
+2. **Lighting**: Apply "{image_lighting}" style
+3. **Color shift**: Shift color palette towards {brand_primary_colors}, integrate {image_aesthetic} aesthetic
+4. **Background treatment**: Align with the product category and brand mood
+
+#### Korean Aesthetic → FLUX.1 English Translation Guide
 
 | Korean Aesthetic | FLUX.1 English Equivalent |
 |---|---|
-| 새벽 감성 | soft pre-dawn atmosphere, misty morning light, blue-hour glow, quiet empty streets |
-| 힙한 / 힙스터 | contemporary urban aesthetic, artisan quality, curated minimalism, indie lifestyle |
-| 레트로 감성 | warm vintage tones, film grain texture, nostalgic color grading, analog warmth |
-| 청춘 / 젊은 감성 | vibrant youthful energy, fresh natural daylight, candid lifestyle, optimistic warmth |
-| 일상의 여유 / 힐링 | tranquil domestic setting, soft diffused light, breathing-room composition, calm neutrals |
-| 럭셔리 / 프리미엄 | elegant studio lighting, rich material textures, sophisticated negative space, refined palette |
-| 미니멀 | clean white space, single focal point, geometric precision, restrained color palette |
-| 감성적 | warm film-like tones, shallow depth of field, intimate framing, soft bokeh |
-| 청량한 | bright airy atmosphere, high-key lighting, fresh cool tones, open sky |
+| 새벽 감성 | soft pre-dawn atmosphere, misty morning light, blue-hour glow |
+| 힙한 / 힙스터 | contemporary urban aesthetic, curated minimalism, indie lifestyle |
+| 레트로 감성 | warm vintage tones, film grain texture, nostalgic color grading |
+| 청춘 / 젊은 감성 | vibrant youthful energy, fresh natural daylight, optimistic warmth |
+| 일상의 여유 / 힐링 | tranquil setting, soft diffused light, calm neutrals |
+| 럭셔리 / 프리미엄 | elegant studio lighting, sophisticated negative space, refined palette |
+| 미니멀 | clean white space, single focal point, restrained color palette |
+| 감성적 | warm film-like tones, shallow depth of field, soft bokeh |
+| 청량한 | bright airy atmosphere, high-key lighting, fresh cool tones |
 
-Build a detailed English prompt that includes:
-- BACKGROUND ONLY — no product or objects; clean open space where the product will be composited
-- Lighting: {image_lighting} that creates a natural shadow/highlight for a product placed in the scene
-- Mood: translate "{image_mood}" using the guide above if applicable
-- Brand colors prominently integrated in background: {brand_primary_colors}
-- Surface / ground area appropriate for product_position "{layout_product_position}"
-- Photo quality descriptors: professional advertising photography, 8K, ultra-sharp, studio-grade
-- Do NOT include any text, typography, or UI elements (added via post-processing)
-
-#### Product-Category Scene Guide
-Read {product_name} and {product_description} to determine the correct scene type.
-Use ONLY ONE of the following scene environments — choose the most relevant:
-
-- **Footwear / Sportswear / Athletic gear**: Dark carbon-textured surface, dramatic single-source rim lighting from upper-left, subtle dynamic speed lines or motion blur in background, empty matte rubber or track-texture ground plane — NO shoes or clothing objects
-- **Skincare / Beauty / Cosmetics**: Soft cream or off-white background, diffused natural window light, organic marble or linen surface texture, faint moisture/dew atmosphere — NO bottles or packaging objects
-- **Food / Beverage**: Rustic dark wood or slate surface, warm amber side-lighting, moody shallow depth-of-field background blur, subtle steam or condensation — NO food items in scene
-- **Electronics / Tech / Gadgets**: Deep charcoal seamless gradient, edge LED rim light creating glow on surface, glossy minimal surface with faint reflection, premium tech aesthetic — NO devices or screens
-- **Fashion / Apparel / Accessories**: Clean editorial studio, directional key light matching brand color tone, smooth gradient seamless backdrop, one-color accent surface — NO clothing or accessories
-- **Health / Wellness / Supplements**: Natural light background with soft plant or nature bokeh, clean minimal surface, fresh cool-toned atmosphere — NO pills or products
-- **Default (if none match)**: Premium studio backdrop using gradient from {brand_primary_colors}, professional four-point lighting rig, clean shadow gradient on ground
-
-IMPORTANT: The scene must make sense as an environment WHERE THE PRODUCT WOULD BE SHOWCASED.
-Generate a UNIQUE composition — vary the angle, depth, and color treatment each time.
-
-### 3. Layout Guide
-Based on layout type "{layout_type}", specify bounding boxes for a {image_width}x{image_height} canvas.
-
-CRITICAL layout rules — follow these EXACTLY to produce a real-looking Korean display ad.
-
-First, determine the canvas orientation:
-- **Horizontal banner** (width > height × 2.5, e.g., {image_width}×{image_height} = {image_width}÷{image_height} ratio): use Side-by-Side layout
-- **Square / portrait** (width ≤ height × 2.5): use Stacked layout
+**CRITICAL rules for the transformation prompt:**
+- START with: "Transform this product advertisement."
+- EXPLICITLY state: "Preserve the main product shape, position, and overall composition."
+- Do NOT describe text, copy, or UI elements (handled in post-processing)
+- Do NOT generate a new background from scratch — transform the existing one
+- END with: "Professional Korean display advertising, 8K, ultra-sharp, no text or UI elements."
 
 ---
-
-### Horizontal Banner Layout (Side-by-Side) — use when {image_width} > {image_height} × 2.5
-
-**Product zone (left side):**
-- product_bbox: x=0, y=0, width = ~35–40% of canvas width, height = canvas height
-- Example for 1660×260: product_bbox ≈ {{ x:0, y:0, width:580, height:260 }}
-
-**Text zone (right side):**
-- text_bbox.x = product_bbox.width (immediately right of product)
-- text_bbox.y = 0
-- text_bbox.width = canvas width - product_bbox.width - logo_bbox.width - 20
-- text_bbox.height = canvas height
-- The renderer will draw a FULL-HEIGHT vertical brand-color band from text_bbox.x to the right edge
-- Text elements are stacked vertically; use SMALL fonts (headline ~32px, sub ~20px, CTA button ~18px)
-- Minimum text_bbox.width check: headline at ~20px/char → ensure width ≥ headline_chars × 20
-
-**Logo zone:**
-- logo_bbox: width=120, height=50; place at the RIGHT EDGE, vertically centered
-- logo_bbox.x = canvas_width - 130, logo_bbox.y = (canvas_height - 50) // 2
-
----
-
-### Square / Portrait Layout (Stacked) — use when {image_width} ≤ {image_height} × 2.5
-
-**Product zone (upper area):**
-- product_bbox must be LARGE — minimum 60% of canvas width AND 55% of canvas height
-- Place the product prominently: center, center-left, or center-right
-- Example for 1080×1080: product_bbox ≈ {{ x:180, y:20, width:720, height:640 }}
-
-**Text zone (bottom area):**
-- text_bbox.y must be at least 60% of canvas height (≥ {image_height} × 0.60)
-- text_bbox.x = 40, text_bbox.width = canvas_width - 80
-- The renderer will draw a FULL-WIDTH horizontal brand-color band from text_bbox.y to the bottom
-- text_bbox.height must fit: 28 + (headline_lines × 62) + 12 + (sub_lines × 42) + 16 + 58 + 24
-- Korean headline is typically 12–18 characters → estimate line count based on text_bbox.width
-
-**Logo zone:**
-- logo_bbox: 140×70 px; top-left or top-right corner (y ≤ 40)
-- Must NOT overlap with text_bbox
-
----
-
-**Non-overlap rule:**
-- product_bbox and text_bbox boundary may touch (product can visually bleed into text zone top)
-- text_bbox and logo_bbox must NOT overlap
 
 Respond ONLY with valid JSON matching this exact structure:
 {{
@@ -191,11 +115,5 @@ Respond ONLY with valid JSON matching this exact structure:
     "subheadline": "한글 서브카피",
     "cta": "행동 유도 문구"
   }},
-  "image_prompt": "detailed English prompt for FLUX.1",
-  "layout_guide": {{
-    "product_bbox": {{"x": 0, "y": 0, "width": 0, "height": 0}},
-    "text_bbox": {{"x": 0, "y": 0, "width": 0, "height": 0}},
-    "logo_bbox": {{"x": 0, "y": 0, "width": 0, "height": 0}},
-    "background_desc": "background description"
-  }}
+  "transformation_prompt": "Transform this product advertisement. [detailed style changes here]. Preserve the main product shape, position, and overall composition structure. Professional Korean display advertising, 8K, ultra-sharp, no text or UI elements."
 }}

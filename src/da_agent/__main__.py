@@ -20,8 +20,8 @@ from da_agent.pipeline import run_pipeline  # noqa: E402
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
 # ── 예시 입력값 (실제 사용 시 교체) ──────────────────────────
-example_clicked_ad   = ["./example/img/ad_1.png", "./example/img/ad_2.png", "./example/img/ad_3.png"]  # 사용자가 클릭한 광고 이미지 (병렬 추출)
-example_product_img  = "./example/img/product.png"  # 광고할 제품 이미지 URL
+example_clicked_ad    = ["./example/img/ad_1.png", "./example/img/ad_2.png", "./example/img/ad_3.png"]  # 사용자가 클릭한 광고 이미지 (병렬 추출)
+example_existing_da   = "./example/img/product_da.png"  # 카피 제거된 기존 제품 DA (img2img 입력)
 example_product_info = {
     "name": "카본 알파 플러스 러닝화",
     "description": "러닝 에너지를 폭발시키는 단 하나의 선택",
@@ -42,7 +42,7 @@ example_guidelines = {
 async def main() -> None:
     result = await run_pipeline(
         user_clicked_ad_image=example_clicked_ad,
-        product_image=example_product_img,
+        existing_product_da=example_existing_da,
         product_info=example_product_info,
         brand_identity=example_brand,
         guidelines=example_guidelines,

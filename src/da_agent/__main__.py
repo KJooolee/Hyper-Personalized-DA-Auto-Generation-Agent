@@ -8,13 +8,9 @@
 import asyncio
 import datetime
 import logging
-<<<<<<< HEAD
 import os
 import urllib.request
 from datetime import datetime
-=======
-import pathlib
->>>>>>> 20d1813e6a11bc7f977dd6d46ad35114edcc996f
 
 from da_agent.utils.http_client import configure_ssl_globally
 
@@ -26,7 +22,7 @@ from da_agent.pipeline import run_pipeline  # noqa: E402
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
 # ── 예시 입력값 (실제 사용 시 교체) ──────────────────────────
-example_clicked_ad   = ["./example/img/ad_1.png", "./example/img/ad_2.jpg", "./example/img/ad_3.jpg"]  # 사용자가 클릭한 광고 이미지 (병렬 추출)
+example_clicked_ad   = ["./example/img/ad_1.webp", "./example/img/ad_2.jpg", "./example/img/ad_3.jpg"]  # 사용자가 클릭한 광고 이미지 (병렬 추출)
 example_product_img  = "./example/img/product.png"  # 광고할 제품 이미지 URL
 example_product_info = {
     "name": "카본 알파 플러스 러닝화",
@@ -54,19 +50,8 @@ async def main() -> None:
         guidelines=example_guidelines,
     )
 
-<<<<<<< HEAD
-=======
-    # 결과 이미지를 output/ 폴더에 저장
-    out_dir = pathlib.Path("output")
-    out_dir.mkdir(exist_ok=True)
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_path = out_dir / f"ad_{timestamp}.png"
-    result.final_image.save(out_path)
-
->>>>>>> 20d1813e6a11bc7f977dd6d46ad35114edcc996f
     print(f"\n✓ 완료: {result.iterations_used}회 시도, 최종 점수 {result.eval_result.score}/100")
     print(f"  Pass: {result.eval_result.passed}")
-    print(f"  저장 위치: {out_path.resolve()}")
     if result.eval_result.issues:
         print("  남은 이슈:")
         for issue in result.eval_result.issues:

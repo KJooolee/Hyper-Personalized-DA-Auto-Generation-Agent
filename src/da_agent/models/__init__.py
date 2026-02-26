@@ -1,4 +1,5 @@
-from .blueprint import AdCopy, Blueprint, BoundingBox, LayoutGuide
+from .ad_layout import AdLayout, BBox
+from .blueprint import AdCopy, Blueprint
 from .evaluation import CategoryScores, EvaluationResult, Issue, Severity
 from .style_dna import CopyStyle, ImageStyle, LayoutStyle, StyleDNA
 
@@ -7,10 +8,10 @@ __all__ = [
     "LayoutStyle",
     "CopyStyle",
     "StyleDNA",
-    "BoundingBox",
     "AdCopy",
-    "LayoutGuide",
     "Blueprint",
+    "BBox",
+    "AdLayout",
     "Severity",
     "CategoryScores",
     "Issue",

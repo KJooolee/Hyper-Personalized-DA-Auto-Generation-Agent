@@ -49,24 +49,52 @@ Tone Constraints: {guidelines_tone}
 
 ### 1. Korean Ad Copy
 
-Write compelling Korean copy that strictly follows:
+#### ABSOLUTE FORBIDDEN RULES (zero exceptions)
+The following are STRICTLY PROHIBITED regardless of reference keywords or any other instruction:
+- Prices, amounts, or currency (예: "800원", "₩5,000", "무료")
+- Discount %, sale, or deal language (예: "65% 할인", "반값", "특가", "세일", "혜택")
+- Time-pressure or scarcity language (예: "오늘만", "한정", "마감", "D-day", "지금 바로")
+- Any promotional claim NOT explicitly listed in {product_features}
+
+**Reference Keywords** ({copy_keywords}) define TONE only — never copy them word-for-word.
+Copy must accurately describe {product_name}'s actual features — do NOT invent benefits.
+
+#### Copy Quality Standards — Follow These Examples
+
+GOOD HEADLINE examples (creative, feature-focused, evocative):
+- "바람을 입다" (for a windbreaker)
+- "매일의 무게, 가볍게" (for a lightweight backpack)
+- "도시의 리듬에 맞춰" (for urban fashion)
+- "피부가 먼저 느끼는 차이" (for skincare)
+
+BAD HEADLINE examples (forbidden — mechanical / promotional):
+- "지금 후드 점퍼 구매 기회!" ← product name + "구매" = lazy and forbidden
+- "최대 80% 할인!" ← discount = STRICTLY FORBIDDEN
+- "오늘만 특가!" ← time pressure = STRICTLY FORBIDDEN
+- "유틸리티 스팬 후드 점퍼 세일" ← just restating product name + sale = FORBIDDEN
+
+GOOD SUBHEADLINE examples:
+- "가벼운 소재에 담은 도시의 감각"
+- "일상과 여행, 두 곳에서 빛나는 디자인"
+- "당신의 스타일이 말하게 하세요"
+
+BAD SUBHEADLINE examples:
+- "웰컴 세일 혜택 받기" ← promotional = FORBIDDEN
+- "지금 바로 구매하세요" ← time pressure = FORBIDDEN
+
+Write compelling Korean copy strictly following:
 - Tone: match "{copy_tone}"
 - Length: match "{copy_length}" category
 - Emphasis: match "{copy_emphasis}"
 - Must NOT contain any forbidden words: {guidelines_forbidden}
 - Must include required phrases: {guidelines_required}
 
-#### STRICT COPY RULES — Reference Keywords
-Reference Keywords ({copy_keywords}) are extracted from OTHER ads the user clicked.
-They define TONE and WRITING STYLE only — never copy them literally.
-
-**FORBIDDEN**: Do NOT use any of the following unless explicitly listed in product_features:
-- Specific prices or amounts (예: "800원", "무료", "$X")
-- Discount percentages or deals (예: "65%", "반값", "할인", "특가")
-- Time-pressure or scarcity claims (예: "오늘만", "한정", "마감", "D-day")
-- Any promotional claim not present in {product_features}
-
-Copy MUST accurately describe {product_name} as given — do NOT invent benefits or promotions.
+#### Self-Check (run before writing final JSON)
+Before outputting, verify each copy line:
+1. Does it contain any price, discount %, or amount? → If YES, rewrite
+2. Does it contain "할인", "세일", "특가", "혜택", "무료", "오늘만", "한정", "마감"? → If YES, rewrite
+3. Does the headline just restate the product name + "구매"? → If YES, rewrite with a creative metaphor or benefit
+4. Is the CTA concise (≤ 8 characters)? → If NO, shorten it
 
 ---
 

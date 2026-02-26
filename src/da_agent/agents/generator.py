@@ -20,7 +20,7 @@ from da_agent.utils.image_utils import (
     overlay_text,
 )
 
-_IMG2IMG_STRENGTH = 0.6   # 스타일 변환 강도 (0=원본 유지, 1=완전 변환)
+_IMG2IMG_STRENGTH = 0.72  # 스타일 변환 강도 (0=원본 유지, 1=완전 변환)
 
 _TEXT_GAP = 12   # 텍스트 요소 간 세로 간격 (px)
 _CTA_GAP = 16    # 서브카피와 CTA 버튼 사이 추가 간격 (px)
@@ -91,7 +91,7 @@ async def _transform_style(
 ) -> Image.Image:
     """Stage 3a: FLUX.1 img2img로 기존 DA를 사용자 선호 스타일로 변환합니다.
 
-    strength=0.6 → 제품·구도는 유지하면서 분위기·색감·조명을 변환합니다.
+    strength=0.72 → 제품·구도는 유지하면서 분위기·색감·조명을 확실하게 변환합니다.
     """
     fal_url = await _get_fal_image_url(existing_da)
 
@@ -153,8 +153,8 @@ async def generate_ad_image(
     canvas_w, canvas_h = styled.size
     banner = _is_horizontal_banner(canvas_w, canvas_h)
 
-    # Stage 3b: Vision LLM으로 텍스트·로고 배치 좌표 결정
-    layout = await analyze_ad_layout(styled)
+    # Stage 3b: 이미지 밝기 분산 분석으로 텍스트·로고 배치 좌표 결정 (Vision LLM 미사용)
+    layout = analyze_ad_layout(styled)
     tz = layout.text_zone
     lz = layout.logo_zone
 

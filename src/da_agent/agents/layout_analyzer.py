@@ -1,55 +1,72 @@
-"""Stage 3b — Vision 기반 레이아웃 분석기
+"""Stage 3b — Pillow 기반 레이아웃 분석기
 
-생성된 이미지를 Vision LLM이 직접 보고 카피·로고의 최적 배치 좌표를 결정합니다.
-LLM이 좌표를 상상하는 대신 실제 이미지를 분석하므로 배치 품질이 크게 향상됩니다.
+이미지의 밝기 분산을 직접 측정해 텍스트·로고 최적 배치 존을 결정합니다.
+Vision LLM을 사용하지 않으므로 API 비용 없이 100% 안정적인 좌표를 반환합니다.
 """
 from __future__ import annotations
 
-import base64
-import json
 import logging
-from io import BytesIO
-from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageStat
 
-from da_agent.config import get_settings
-from da_agent.models.ad_layout import AdLayout
-from da_agent.utils.http_client import create_openai_client
+from da_agent.models.ad_layout import AdLayout, BBox
 
 logger = logging.getLogger(__name__)
 
-_TEMPLATE_PATH = (
-    Path(__file__).parent.parent / "utils/prompt_templates/layout_analyzer.txt"
-)
+# 텍스트 배치 후보 존 — 이미지 비율로 정의 (x, y, w, h) as fractions
+_CANDIDATE_ZONES: dict[str, tuple[float, float, float, float]] = {
+    "bottom": (0.0, 0.60, 1.0, 0.40),   # 하단 40%
+    "top":    (0.0, 0.0,  1.0, 0.35),   # 상단 35%
+    "left":   (0.0, 0.0,  0.40, 1.0),   # 좌측 40%
+}
+
+# 로고 존 크기 (이미지 대비 비율)
+_LOGO_W_RATIO = 0.15
+_LOGO_H_RATIO = 0.07
+_LOGO_MARGIN = 20   # px
 
 
-def _image_to_data_url(image: Image.Image) -> str:
-    """PIL Image를 Vision API용 base64 JPEG data URL로 변환합니다."""
-    buf = BytesIO()
-    image.convert("RGB").save(buf, format="JPEG", quality=90)
-    b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-    return f"data:image/jpeg;base64,{b64}"
+def _zone_stddev(gray: Image.Image, x: int, y: int, w: int, h: int) -> float:
+    """지정된 픽셀 영역의 밝기 표준편차를 반환합니다. 낮을수록 단조로운 배경."""
+    crop = gray.crop((x, y, x + w, y + h))
+    return ImageStat.Stat(crop).stddev[0]
 
 
-def _clamp_layout(layout: AdLayout, canvas_w: int, canvas_h: int) -> AdLayout:
-    """Vision이 반환한 좌표를 캔버스 경계 내로 클램핑합니다."""
-    def clamp_bbox(bbox, max_w, max_h):
-        x = max(0, min(bbox.x, max_w - 1))
-        y = max(0, min(bbox.y, max_h - 1))
-        w = max(1, min(bbox.width, max_w - x))
-        h = max(1, min(bbox.height, max_h - y))
-        return bbox.__class__(x=x, y=y, width=w, height=h)
+def _pick_text_zone(gray: Image.Image, canvas_w: int, canvas_h: int) -> str:
+    """각 후보 존의 밝기 분산을 비교해 가장 단조로운 존 이름을 반환합니다."""
+    best: str | None = None
+    best_std = float("inf")
+    for name, (xr, yr, wr, hr) in _CANDIDATE_ZONES.items():
+        x, y = int(xr * canvas_w), int(yr * canvas_h)
+        w, h = int(wr * canvas_w), int(hr * canvas_h)
+        std = _zone_stddev(gray, x, y, w, h)
+        logger.debug("Zone '%s' stddev=%.1f", name, std)
+        if std < best_std:
+            best_std = std
+            best = name
+    return best  # type: ignore[return-value]
 
-    return AdLayout(
-        text_zone=clamp_bbox(layout.text_zone, canvas_w, canvas_h),
-        logo_zone=clamp_bbox(layout.logo_zone, canvas_w, canvas_h),
-        text_color=layout.text_color if layout.text_color in ("white", "dark") else "white",
-    )
+
+def _build_logo_zone(
+    zone_name: str, canvas_w: int, canvas_h: int
+) -> BBox:
+    """텍스트 존과 겹치지 않는 코너에 로고 존을 배치합니다."""
+    lw = max(80, int(canvas_w * _LOGO_W_RATIO))
+    lh = max(40, int(canvas_h * _LOGO_H_RATIO))
+
+    # 텍스트가 하단 → 로고는 우상단 / 텍스트가 상단 → 로고는 우하단 / 좌측 → 우상단
+    if zone_name == "top":
+        lx = canvas_w - lw - _LOGO_MARGIN
+        ly = canvas_h - lh - _LOGO_MARGIN
+    else:  # bottom or left → 우상단
+        lx = canvas_w - lw - _LOGO_MARGIN
+        ly = _LOGO_MARGIN
+
+    return BBox(x=lx, y=ly, width=lw, height=lh)
 
 
-async def analyze_ad_layout(image: Image.Image) -> AdLayout:
-    """Stage 3b: 생성 이미지를 Vision으로 분석해 카피·로고 배치 존을 결정합니다.
+def analyze_ad_layout(image: Image.Image) -> AdLayout:
+    """Stage 3b: 이미지 밝기 분산 분석으로 카피·로고 배치 존을 결정합니다.
 
     Args:
         image: FLUX img2img로 스타일 변환이 완료된 PIL Image
@@ -57,43 +74,32 @@ async def analyze_ad_layout(image: Image.Image) -> AdLayout:
     Returns:
         AdLayout — text_zone, logo_zone, text_color
     """
-    settings = get_settings()
-    client = create_openai_client()
     canvas_w, canvas_h = image.size
+    gray = image.convert("L")
 
-    template = _TEMPLATE_PATH.read_text(encoding="utf-8")
-    prompt = template.format(width=canvas_w, height=canvas_h)
+    # 가장 단조로운 배경 구역 선택
+    zone_name = _pick_text_zone(gray, canvas_w, canvas_h)
+    xr, yr, wr, hr = _CANDIDATE_ZONES[zone_name]
+    tz_x = int(xr * canvas_w)
+    tz_y = int(yr * canvas_h)
+    tz_w = int(wr * canvas_w)
+    tz_h = int(hr * canvas_h)
 
-    response = await client.chat.completions.create(
-        model=settings.stage1_model,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": _image_to_data_url(image),
-                            "detail": "high",
-                        },
-                    },
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ],
-        response_format={"type": "json_object"},
-        max_tokens=512,
-    )
+    # 텍스트 색상: 선택 존의 평균 밝기로 결정
+    crop = gray.crop((tz_x, tz_y, tz_x + tz_w, tz_y + tz_h))
+    mean_brightness = ImageStat.Stat(crop).mean[0]
+    text_color = "dark" if mean_brightness > 140 else "white"
 
-    raw = json.loads(response.choices[0].message.content)
-    raw.pop("reasoning", None)  # 모델 필드에 없는 reasoning 제거
-    layout = AdLayout(**raw)
-    layout = _clamp_layout(layout, canvas_w, canvas_h)
+    text_zone = BBox(x=tz_x, y=tz_y, width=tz_w, height=tz_h)
+    logo_zone = _build_logo_zone(zone_name, canvas_w, canvas_h)
 
     logger.info(
-        "Layout analysis: text_zone=%s, logo_zone=%s, text_color=%s",
-        layout.text_zone,
-        layout.logo_zone,
-        layout.text_color,
+        "Layout (Pillow): zone=%s stddev-based, text_zone=%s, logo_zone=%s, "
+        "text_color=%s (brightness=%.0f)",
+        zone_name,
+        text_zone,
+        logo_zone,
+        text_color,
+        mean_brightness,
     )
-    return layout
+    return AdLayout(text_zone=text_zone, logo_zone=logo_zone, text_color=text_color)

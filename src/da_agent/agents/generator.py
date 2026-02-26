@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 
 import fal_client
 from PIL import Image
 
+from da_agent.agents.layout_analyzer import analyze_ad_layout
 from da_agent.config import get_settings
 from da_agent.models.blueprint import Blueprint
 from da_agent.utils.image_utils import (
@@ -15,10 +17,10 @@ from da_agent.utils.image_utils import (
     measure_text_height,
     overlay_cta_button,
     overlay_logo,
-    overlay_product,
     overlay_text,
-    remove_background,
 )
+
+_IMG2IMG_STRENGTH = 0.6   # 스타일 변환 강도 (0=원본 유지, 1=완전 변환)
 
 _TEXT_GAP = 12   # 텍스트 요소 간 세로 간격 (px)
 _CTA_GAP = 16    # 서브카피와 CTA 버튼 사이 추가 간격 (px)
@@ -75,89 +77,117 @@ def _brand_cta_color(brand_identity: dict) -> tuple[int, int, int, int]:
     return (r, g, b, 255)
 
 
+async def _get_fal_image_url(path_or_url: str) -> str:
+    """로컬 파일 경로면 fal.ai에 업로드하고 URL을 반환합니다."""
+    if path_or_url.startswith(("http://", "https://")):
+        return path_or_url
+    return await asyncio.to_thread(fal_client.upload_file, path_or_url)
+
+
+async def _transform_style(
+    existing_da: str,
+    transformation_prompt: str,
+    settings,
+) -> Image.Image:
+    """Stage 3a: FLUX.1 img2img로 기존 DA를 사용자 선호 스타일로 변환합니다.
+
+    strength=0.6 → 제품·구도는 유지하면서 분위기·색감·조명을 변환합니다.
+    """
+    fal_url = await _get_fal_image_url(existing_da)
+
+    result = await fal_client.run_async(
+        "fal-ai/flux/dev/image-to-image",
+        arguments={
+            "image_url": fal_url,
+            "prompt": transformation_prompt,
+            "strength": _IMG2IMG_STRENGTH,
+            "image_size": {
+                "width": settings.image_width,
+                "height": settings.image_height,
+            },
+            "num_inference_steps": 28,
+            "guidance_scale": 3.5,
+            "num_images": 1,
+            "enable_safety_checker": True,
+        },
+    )
+
+    image_url = result["images"][0]["url"]
+    return await load_image(image_url)
+
+
 async def generate_ad_image(
     blueprint: Blueprint,
     brand_identity: dict,
-    product_image_url: str | None = None,
+    existing_product_da: str,
 ) -> tuple[Image.Image, bytes]:
-    """Stage 3: Blueprint를 바탕으로 최종 광고 이미지를 생성·합성합니다.
+    """Stage 3: 기존 제품 DA를 스타일 변환하고 카피·로고를 합성합니다.
 
     레이어 순서:
-      1) FLUX.1 배경 이미지 생성 (txt2img)
-      2) 제품 이미지 합성 (배경 제거 후, 확대·축소 + 캔버스 클램핑)
-      3) 텍스트 존 컬러 밴드
-         - 가로형 배너: text_bbox.x부터 우측 끝까지 세로 밴드
-         - 정사각형/세로형: text_bbox.y부터 하단 끝까지 가로 밴드
-      4) 헤드라인 + 서브카피 텍스트 (캔버스 오버플로 방지)
-      5) CTA 버튼 (캔버스 오버플로 방지)
-      6) 브랜드 로고 합성
+      1) FLUX.1 img2img — 기존 DA를 사용자 선호 스타일로 변환
+      2) Vision LLM — 변환된 이미지를 분석해 최적 텍스트·로고 배치 좌표 결정
+      3) Pillow 합성
+         a) 텍스트 존 반투명 컬러 밴드
+         b) 헤드라인 + 서브카피
+         c) CTA 버튼
+         d) 브랜드 로고
 
     Args:
-        blueprint: 설계도 (카피, 이미지 프롬프트, 레이아웃 가이드)
+        blueprint: 설계도 (카피, img2img 변환 프롬프트)
         brand_identity: 브랜드 아이덴티티 (로고 URL, 컬러)
-        product_image_url: 실제 제품 이미지 경로/URL
+        existing_product_da: 카피 제거된 기존 제품 DA 경로/URL
 
     Returns:
         (PIL Image, PNG bytes)
     """
     settings = get_settings()
+    if settings.fal_key:
+        os.environ["FAL_KEY"] = settings.fal_key
 
-    # 1. 배경 이미지 생성 (txt2img)
-    base_image = await _generate_base_image(blueprint, settings)
-    canvas_w, canvas_h = base_image.size
-    lg = blueprint.layout_guide
+    # Stage 3a: img2img 스타일 변환
+    styled = await _transform_style(
+        existing_product_da,
+        blueprint.transformation_prompt,
+        settings,
+    )
+    canvas_w, canvas_h = styled.size
     banner = _is_horizontal_banner(canvas_w, canvas_h)
 
-    # 2. 실제 제품 이미지 합성
-    if product_image_url:
-        product_img = await load_image(product_image_url)
-        product_img = remove_background(product_img)
-        composed = overlay_product(
-            base_image,
-            product=product_img,
-            x=lg.product_bbox.x,
-            y=lg.product_bbox.y,
-            width=lg.product_bbox.width,
-            height=lg.product_bbox.height,
-        )
-    else:
-        composed = base_image
+    # Stage 3b: Vision LLM으로 텍스트·로고 배치 좌표 결정
+    layout = await analyze_ad_layout(styled)
+    tz = layout.text_zone
+    lz = layout.logo_zone
 
-    # 3. 텍스트 존 컬러 밴드 — 비율에 따라 가로/세로 밴드 선택
+    # Stage 3c: Pillow 합성
+    # 텍스트 색상 결정 (Vision이 배경 밝기를 분석해 결정)
+    if layout.text_color == "white":
+        text_fg_color = (255, 255, 255, 255)
+        sub_fg_color = (210, 210, 210, 220)
+    else:
+        text_fg_color = (20, 20, 20, 255)
+        sub_fg_color = (60, 60, 60, 220)
+
+    # 3c-1. 텍스트 존 반투명 배경 밴드
     zone_color = _brand_zone_color(brand_identity)
-    if banner:
-        # 가로형 배너: text_bbox.x부터 오른쪽 끝까지 전체 높이 세로 밴드
-        zone_x = lg.text_bbox.x
-        zone_y = 0
-        zone_w = canvas_w - lg.text_bbox.x
-        zone_h = canvas_h
-    else:
-        # 정사각형/세로형: text_bbox.y부터 아래쪽 끝까지 전체 너비 가로 밴드
-        zone_x = 0
-        zone_y = lg.text_bbox.y
-        zone_w = canvas_w
-        zone_h = canvas_h - lg.text_bbox.y
-
     composed = draw_text_zone_background(
-        composed,
-        x=zone_x,
-        y=zone_y,
-        width=zone_w,
-        height=zone_h,
+        styled,
+        x=tz.x,
+        y=tz.y,
+        width=tz.width,
+        height=tz.height,
         color=zone_color,
         alpha=215,
     )
 
-    # 4. 헤드라인 + 서브카피 오버레이
-    text_x = lg.text_bbox.x + _TEXT_ZONE_PADDING_SIDE
-    text_y = lg.text_bbox.y + _TEXT_ZONE_PADDING_TOP
+    # 3c-2. 헤드라인 + 서브카피
+    text_x = tz.x + _TEXT_ZONE_PADDING_SIDE
+    text_y = tz.y + _TEXT_ZONE_PADDING_TOP
 
-    # max_w는 ① text_bbox 내부 너비, ② 캔버스 오른쪽 경계까지 남은 거리 중 작은 값으로 클램핑
-    # → architect가 text_bbox.x + text_bbox.width > canvas_w를 잘못 생성해도 텍스트 우측 잘림 방지
+    # max_w: text_zone 내부 너비와 캔버스 우측 경계 중 작은 값으로 클램핑
     max_w = max(
         50,
         min(
-            lg.text_bbox.width - _TEXT_ZONE_PADDING_SIDE * 2,
+            tz.width - _TEXT_ZONE_PADDING_SIDE * 2,
             canvas_w - text_x - _TEXT_ZONE_PADDING_SIDE,
         ),
     )
@@ -168,7 +198,6 @@ async def generate_ad_image(
     cta_size = 18 if banner else 26
     cta_btn_h = 36 if banner else _CTA_BTN_HEIGHT
 
-    # 캔버스 높이를 넘지 않는 경우만 렌더링
     if text_y < canvas_h:
         composed = overlay_text(
             composed,
@@ -178,7 +207,7 @@ async def generate_ad_image(
             max_width=max_w,
             font_size=headline_size,
             bold=True,
-            color=(255, 255, 255, 255),
+            color=text_fg_color,
             shadow=False,
         )
     headline_h = measure_text_height(
@@ -195,18 +224,18 @@ async def generate_ad_image(
             max_width=max_w,
             font_size=sub_size,
             bold=False,
-            color=(210, 210, 210, 220),
+            color=sub_fg_color,
             shadow=False,
         )
     sub_h = measure_text_height(
         blueprint.ad_copy.subheadline, max_w, font_size=sub_size, bold=False
     )
 
-    # 5. CTA 버튼 — 캔버스 하단을 넘지 않도록 y 클램핑
+    # 3c-3. CTA 버튼 — 캔버스 하단을 넘지 않도록 y 클램핑
     cta_btn_w = min(_CTA_BTN_MAX_WIDTH, max_w)
     cta_btn_x = text_x
     cta_btn_y = sub_y + sub_h + _CTA_GAP
-    cta_btn_y = min(cta_btn_y, canvas_h - cta_btn_h - 4)  # 캔버스 밖으로 밀려나지 않도록
+    cta_btn_y = min(cta_btn_y, canvas_h - cta_btn_h - 4)
 
     if cta_btn_y >= 0 and cta_btn_y + cta_btn_h <= canvas_h:
         cta_color = _brand_cta_color(brand_identity)
@@ -222,45 +251,17 @@ async def generate_ad_image(
             font_size=cta_size,
         )
 
-    # 6. 브랜드 로고 합성
+    # 3c-4. 브랜드 로고 합성
     logo_url = brand_identity.get("logo_url")
     if logo_url:
         logo_img = await load_image(logo_url)
         composed = overlay_logo(
             composed,
             logo=logo_img,
-            x=lg.logo_bbox.x,
-            y=lg.logo_bbox.y,
-            width=lg.logo_bbox.width,
-            height=lg.logo_bbox.height,
+            x=lz.x,
+            y=lz.y,
+            width=lz.width,
+            height=lz.height,
         )
 
     return composed, image_to_bytes(composed)
-
-
-async def _generate_base_image(blueprint: Blueprint, settings) -> Image.Image:
-    """FLUX.1 [dev] API로 배경 이미지를 생성합니다 (txt2img).
-
-    image_prompt는 architect가 제품 카테고리와 브랜드 무드에 맞게 생성합니다.
-    배경에 제품·텍스트·UI 요소가 포함되지 않도록 architect.txt에서 엄격히 제한합니다.
-    """
-    if settings.fal_key:
-        os.environ["FAL_KEY"] = settings.fal_key
-
-    result = await fal_client.run_async(
-        settings.image_gen_model,
-        arguments={
-            "prompt": blueprint.image_prompt,
-            "image_size": {
-                "width": settings.image_width,
-                "height": settings.image_height,
-            },
-            "num_inference_steps": 28,
-            "guidance_scale": 3.5,
-            "num_images": 1,
-            "enable_safety_checker": True,
-        },
-    )
-
-    image_url = result["images"][0]["url"]
-    return await load_image(image_url)

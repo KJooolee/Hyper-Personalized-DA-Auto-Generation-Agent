@@ -76,7 +76,6 @@ async def create_blueprint(
         product_name=product_info.get("name", ""),
         product_description=product_info.get("description", ""),
         product_features=", ".join(product_info.get("features", [])),
-        product_image_url=product_info.get("image_url", ""),
         # Brand
         brand_primary_colors=", ".join(brand_identity.get("primary_colors", [])),
         brand_secondary_colors=", ".join(brand_identity.get("secondary_colors", [])),
@@ -85,10 +84,6 @@ async def create_blueprint(
         guidelines_required=", ".join(guidelines.get("required_elements", [])),
         guidelines_forbidden=", ".join(guidelines.get("forbidden_elements", [])),
         guidelines_tone=", ".join(guidelines.get("tone_constraints", [])),
-        guidelines_media_specs=str(guidelines.get("media_specs", {})),
-        # Image canvas size
-        image_width=settings.image_width,
-        image_height=settings.image_height,
         # Feedback loop
         feedback_section=feedback_section,
     )

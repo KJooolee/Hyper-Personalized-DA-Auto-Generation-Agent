@@ -34,7 +34,7 @@ class PipelineResult:
 
 async def run_pipeline(
     user_clicked_ad_image: str | list[str],
-    product_image: str,
+    existing_product_da: str,
     product_info: dict,
     brand_identity: dict,
     guidelines: dict,
@@ -44,8 +44,8 @@ async def run_pipeline(
 
     Args:
         user_clicked_ad_image: 사용자가 클릭한 광고 이미지 URL
-        product_image: 광고할 제품 이미지 URL
-        product_info: { name, description, features[], image_url }
+        existing_product_da: 카피 제거된 기존 제품 DA 경로/URL (img2img 입력)
+        product_info: { name, description, features[] }
         brand_identity: { logo_url, primary_colors[], secondary_colors[] }
         guidelines: { required_elements[], forbidden_elements[],
                       tone_constraints[], media_specs{} }
@@ -54,7 +54,6 @@ async def run_pipeline(
         PipelineResult (최종 이미지, 평가 결과, 반복 횟수 포함)
     """
     settings = get_settings()
-    product_info = {**product_info, "image_url": product_image}
 
     # ── Stage 1: 병렬 스타일 DNA 추출 ───────────────────────────────────────
     logger.info("Stage 1: extracting style DNA from user-clicked ad...")
@@ -82,12 +81,12 @@ async def run_pipeline(
         )
         logger.info("Blueprint ad_copy: %s", blueprint.ad_copy.model_dump())
 
-        # Stage 3: 이미지 생성 + 실제 제품 합성 + 카피/로고 합성
+        # Stage 3: img2img 스타일 변환 + Vision 레이아웃 분석 + 카피/로고 합성
         logger.info("Stage 3: generating ad image...")
         generated_image, image_bytes = await generate_ad_image(
             blueprint,
             brand_identity,
-            product_image_url=product_info.get("image_url"),
+            existing_product_da=existing_product_da,
         )
 
         # Stage 4: 가이드라인 적합성 평가 (이중 검증: Vision + 텍스트 직접)

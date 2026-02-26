@@ -3,8 +3,8 @@ from pathlib import Path
 
 from da_agent.config import get_settings
 from da_agent.models.style_dna import LayoutStyle
-from da_agent.utils.http_client import create_anthropic_client
-from da_agent.utils.image_utils import prepare_image_for_anthropic
+from da_agent.utils.http_client import create_openai_client
+from da_agent.utils.image_utils import prepare_image_for_api
 
 _TEMPLATE_PATH = (
     Path(__file__).parent.parent.parent
@@ -15,24 +15,28 @@ _TEMPLATE_PATH = (
 async def extract_layout_style(image_url: str) -> LayoutStyle:
     """Stage 1b: 광고 이미지에서 레이아웃 구도(배치·시선흐름·여백)를 추출합니다."""
     settings = get_settings()
-    client = create_anthropic_client()
+    client = create_openai_client()
     system_prompt = _TEMPLATE_PATH.read_text(encoding="utf-8")
-    image_block = prepare_image_for_anthropic(image_url)
+    api_image_url = prepare_image_for_api(image_url)
 
-    response = await client.messages.create(
+    response = await client.chat.completions.create(
         model=settings.stage1_model,
-        system=system_prompt,
         messages=[
+            {"role": "system", "content": system_prompt},
             {
                 "role": "user",
                 "content": [
-                    image_block,
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": api_image_url, "detail": "high"},
+                    },
                     {"type": "text", "text": "Extract the layout composition from this ad."},
                 ],
-            }
+            },
         ],
+        response_format={"type": "json_object"},
         max_tokens=512,
     )
 
-    raw = json.loads(response.content[0].text)
+    raw = json.loads(response.choices[0].message.content)
     return LayoutStyle(**raw)

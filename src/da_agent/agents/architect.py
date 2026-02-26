@@ -5,7 +5,7 @@ from da_agent.config import get_settings
 from da_agent.models.blueprint import Blueprint
 from da_agent.models.evaluation import EvaluationResult
 from da_agent.models.style_dna import StyleDNA
-from da_agent.utils.http_client import create_anthropic_client
+from da_agent.utils.http_client import create_openai_client
 
 _TEMPLATE_PATH = (
     Path(__file__).parent.parent / "utils/prompt_templates/architect.txt"
@@ -50,7 +50,7 @@ async def create_blueprint(
 ) -> Blueprint:
     """Stage 2: Style DNA + 광고주 데이터 → 생성 설계도(Blueprint) 작성."""
     settings = get_settings()
-    client = create_anthropic_client()
+    client = create_openai_client()
 
     template = _TEMPLATE_PATH.read_text(encoding="utf-8")
     feedback_section = _build_feedback_section(feedback or [])
@@ -88,11 +88,12 @@ async def create_blueprint(
         feedback_section=feedback_section,
     )
 
-    response = await client.messages.create(
+    response = await client.chat.completions.create(
         model=settings.stage2_model,
         messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"},
         max_tokens=2048,
     )
 
-    raw = json.loads(response.content[0].text)
+    raw = json.loads(response.choices[0].message.content)
     return Blueprint(**raw)

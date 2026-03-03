@@ -1,144 +1,127 @@
-# Hyper-Personalized DA Auto-Generation Agent
+# 초개인화 DA 자동 생성 AI 에이전트
 
-## Abstract
-
-본 프로젝트는 사용자가 상호작용한 광고 이미지로부터 **Style DNA**를 추출하고, 이를 브랜드 가이드라인 및 신규 제품 정보와 결합하여 새로운 광고 이미지를 자동 생성하는 멀티 에이전트 기반 파이프라인을 제안합니다.  
-
-시스템은 추출(Extraction), 설계(Architecture Design), 생성(Generation), 검증(Validation)의 네 단계로 구성되며, 검증 단계에서 기준 미달 시 설계 단계로 회귀하는 **Feedback Loop 구조**를 포함한다. 이를 통해 스타일 일관성과 브랜드 적합성을 동시에 만족하는 자동화된 광고 생성 프로세스를 구현합니다.
+> 사용자 클릭 광고에서 시각적 선호 스타일을 추출하고, 신규 제품에 맞는 광고 이미지를 자동으로 생성·검증하는 멀티 에이전트 파이프라인
 
 ---
 
-## 1. System Overview
+## 주제
 
-본 시스템은 다음의 순차적 구조를 따릅니다:
+**광고 소재 제작 자동화 — 사용자 선호 기반 초개인화 DA(Display Ad) 생성**
 
-**Input Advertisement → Style Extraction → Blueprint Design → Image Synthesis → Guideline Verification**
+디지털 광고 소재를 사람이 직접 기획·제작하지 않고, AI 에이전트가 **사용자 행동 데이터 → 스타일 추출 → 설계 → 이미지 생성 → 자동 검수**까지 전 과정을 처리하는 end-to-end 시스템입니다.
 
-검증 실패 시 설계 단계로 회귀하여 재생성 과정을 수행합니다.
+---
 
-```mermaid
-graph LR
-    A[Input Ad] --> B[Extractor]
-    B --> C[Architect]
-    C --> D[Generator]
-    D --> E[Critic]
-    E -- Fail --> C
-    E -- Pass --> F[Final Output]
+## 문제 정의
+
+### 1. 개인화 소재 제작의 한계
+광고 효율은 소재의 개인화 수준에 직결되지만, 기존 DA 제작 방식은 디자이너가 수작업으로 제작하기 때문에 사용자별 맞춤 소재 제공이 현실적으로 불가능합니다.
+
+### 2. 클릭 데이터를 소재에 활용하지 못함
+사용자가 어떤 광고를 클릭했는지는 로그로 남지만, **"왜 클릭했는가(색감 선호, 카피 톤, 레이아웃 취향)"** 를 자동으로 해석해 신규 소재에 반영하는 시스템이 없었습니다.
+
+### 3. 가이드라인 검수 부재
+생성된 광고가 브랜드 가이드라인(금지어, 필수 요소, 매체 규격)을 위반해도 검수자가 수동으로 확인하기 전까지 발견이 어렵습니다.
+
+---
+
+## 문제 해결
+
+### 아키텍처 — 4단계 멀티 에이전트 파이프라인
+
+```
+[사용자 클릭 광고]  →  Stage 1 (추출)  →  Stage 2 (설계)  →  Stage 3 (생성)  →  Stage 4 (평가)
+                                                                                        │
+                                                         PASS ◄──────────────────────┘
+                                                           │         FAIL: 피드백 포함 Stage 2 재진입
+                                                      최종 광고 반환
+```
+
+| Stage | 역할 | 핵심 설계 |
+|---|---|---|
+| **Stage 1 Extractor** | 클릭 광고 이미지 분석 → Style DNA 추출 | 이미지 스타일 / 레이아웃 / 카피 톤 3개 축을 `asyncio.gather()`로 **병렬** 호출 |
+| **Stage 2 Architect** | Style DNA + 제품 정보 → 생성 설계도(Blueprint) 작성 | 한국 감성 키워드 → FLUX.1 영문 프롬프트 자동 변환, 캔버스 비율에 따른 레이아웃 좌표 자동 산출 |
+| **Stage 3 Generator** | AI 배경 이미지 생성 + 제품·텍스트·로고 합성 | FLUX.1 txt2img로 배경 생성, `rembg` 배경 제거 후 Pillow로 실제 제품 사진 합성 |
+| **Stage 4 Evaluator** | 브랜드/매체 가이드라인 자동 검수 | Vision 분석(시각 요소) + 카피 텍스트 직접 검사(금지어·법적 문구)의 이중 검증 |
+
+### 주요 기술적 의사결정
+
+**① 비용 최적화 모델 배분**
+```
+Stage 1, 4  →  gpt-4o-mini   : 분류·평가는 경량 모델로 충분, 3회 병렬 호출도 저비용
+Stage 2     →  gpt-4o        : 카피 품질 + 프롬프트 엔지니어링이 전체 광고 성과 결정
+Stage 3     →  FLUX.1 (fal.ai): 로컬 GPU 없이 클라우드 API로 고품질 이미지 생성
+```
+
+**② 텍스트 이중 검증으로 OCR 오류 제거**
+생성된 이미지에서 한글을 OCR로 재인식하는 대신, Stage 2에서 생성한 카피 텍스트 원본을 Stage 4에 직접 전달합니다. 소형·장식 폰트의 OCR 오인식 리스크를 제거하고 검수 정확도를 높입니다.
+
+**③ 어절 단위 텍스트 줄바꿈**
+Pillow의 기본 글자 단위 wrapping은 한국어에서 어절 중간 분리("가격" → "가" / "금")를 발생시킵니다. 띄어쓰기 기준 어절 단위로 먼저 줄바꿈을 시도하고, 단일 어절이 max_width를 초과할 때만 글자 단위로 강제 분할하는 방식으로 해결했습니다.
+
+**④ 평가 루프로 품질 보장**
+한 번 생성으로 끝나지 않고, 가이드라인 미달 시 이전 평가의 이슈와 수정 방향을 컨텍스트에 포함해 재설계 → 재생성을 최대 N회 자동 반복합니다.
+
+### 기술 스택
+
+| 분류 | 기술 |
+|---|---|
+| **언어 / 환경** | Python 3.12, uv |
+| **비동기 처리** | asyncio, httpx |
+| **LLM (추출·설계·평가)** | GPT-4o, GPT-4o-mini (OpenAI API) |
+| **이미지 생성** | FLUX.1 [dev] via fal.ai |
+| **이미지 후처리** | Pillow, rembg (배경 제거) |
+| **데이터 모델** | Pydantic v2 |
+| **설정 관리** | pydantic-settings, python-dotenv |
+
+---
+
+## 결과
+
+### 자동화 달성 범위
+
+| 기존 프로세스 | 자동화 후 |
+|---|---|
+| 디자이너가 수작업으로 레이아웃 기획 | Style DNA 기반 레이아웃 좌표 자동 산출 |
+| 카피라이터가 톤앤매너 직접 작성 | 사용자 클릭 광고의 카피 스타일 추출 → 신규 제품 카피 자동 생성 |
+| 이미지 배경 촬영 또는 수작업 제작 | FLUX.1 프롬프트 자동 생성 → 제품 카테고리 맞춤 배경 자동 생성 |
+| 검수자가 가이드라인 항목 수동 확인 | Vision + 텍스트 이중 검증으로 자동 채점 및 피드백 생성 |
+| 미달 시 처음부터 재작업 | 평가 피드백 포함 자동 재설계 루프 |
+
+### 산출물 예시
+
+- 클릭 광고 1장 입력 → 신규 제품 광고 이미지 1장(1000*1000) + 가이드라인 평가 리포트 자동 출력
+- 가이드라인 미통과 시 최대 3회 자동 재생성, 최종 점수 기준 최고 결과물 반환
+
+---
+
+## 프로젝트 구조
+
+```
+src/da_agent/
+├── pipeline.py              # 전체 파이프라인 오케스트레이터
+├── config.py                # 환경변수·모델 설정 (pydantic-settings)
+├── agents/
+│   ├── extractor/           # Stage 1: 이미지 스타일·레이아웃·카피 병렬 추출
+│   ├── architect.py         # Stage 2: Blueprint 생성 (카피 + 이미지 프롬프트 + 레이아웃)
+│   ├── generator.py         # Stage 3: FLUX.1 생성 + Pillow 합성
+│   └── evaluator.py         # Stage 4: 가이드라인 자동 검수
+├── models/                  # Pydantic 데이터 모델 (Stage 간 타입 보장)
+└── utils/
+    ├── image_utils.py       # 한글 텍스트 렌더링, 배경 제거, 이미지 합성
+    └── prompt_templates/    # LLM 시스템 프롬프트 (한국 감성 → 영문 변환 규칙 포함)
+```
+
+## 빠른 시작
+
+```bash
+git clone https://github.com/KJooolee/Hyper-Personalized-DA-Auto-Generation-Agent.git
+cd Hyper-Personalized-DA-Auto-Generation-Agent
+uv sync
+cp .env.example .env   # API 키 입력 (OpenAI, fal.ai)
+uv run python -m da_agent
 ```
 
 ---
 
-## 2. Methodology
-
-### 2.1 Stage I — Extractor (Style DNA Extraction)
-
-시각 및 텍스트 특성 분석을 병렬적으로 수행하기 위해 세 개의 독립 모듈로 분리하였습니다.
-
-- **Image Style Agent**
-  - 조명 특성 분석
-  - 색상 분포 및 팔레트 추출
-  - 전반적 무드 및 질감 파악
-
-- **Layout Style Agent**
-  - 시각적 계층 구조 분석
-  - 제품 및 텍스트 배치 구조 추론
-  - 시선 흐름 모델링
-
-- **Copy Style Agent**
-  - 문체 및 어조 분석
-  - 평균 문장 길이 및 강조 방식 추출
-  - 설득 구조 패턴 분석
-
-이 단계의 출력은 구조화된 **Style DNA Representation**입니다.
-
----
-
-### 2.2 Stage II — Architect (Blueprint Construction)
-
-Extractor 단계에서 도출된 Style DNA를 신규 제품 정보 및 브랜드 가이드라인과 결합하여 생성 설계도를 구성합니다.
-
-주요 구성 요소는 다음과 같습니다:
-
-- **Prompt Engineering**
-  - FLUX.1 입력을 위한 구조화된 영문 프롬프트 생성
-  - 스타일 제약 조건 및 부정 프롬프트 포함
-
-- **Layout Mapping**
-  - 텍스트 및 제품 객체의 좌표 및 영역 정의
-  - 상대적 비율 및 여백 규칙 명시
-
-- **Copy Generation**
-  - 스타일 기반 헤드라인 생성
-  - 브랜드 가이드라인을 준수하는 광고 카피 작성
-
-이 단계의 결과물은 Generator 단계에 전달되는 **Blueprint Specification**입니다.
-
----
-
-### 2.3 Stage III — Generator (Image Synthesis)
-
-설계도에 기반하여 광고 이미지를 합성합니다.
-
-- **Base Generation**
-  - FLUX.1 [dev] 모델을 사용한 배경 및 오브젝트 생성
-
-- **Structural Consistency Control**
-  - ControlNet을 통한 형태 및 레이아웃 유지
-
-- **Post-processing**
-  - Pillow 기반 텍스트 및 로고 오버레이
-  - 최종 해상도 및 포맷 정규화
-
----
-
-### 2.4 Stage IV — Critic (Guideline Verification & Feedback Loop)
-
-생성된 결과물이 브랜드 및 매체 가이드라인을 충족하는지 평가합니다.
-
-- 텍스트 가독성 검사
-- 로고 위치 및 크기 검증
-- 금지 요소 포함 여부 확인
-- 레이아웃 규칙 준수 여부 평가
-
-기준을 충족하지 못할 경우, 위반 사유를 구조화하여 Architect 단계로 전달하고 재설계를 수행합니다.
-
----
-
-## 3. Implementation Structure
-
-본 프로젝트는 uv 기반 의존성 관리 시스템을 사용하며, 에이전트 중심 모듈 구조를 따릅니다.
-
-```
-.
-├── src/
-│   └── da_agent/
-│       ├── agents/
-│       │   ├── extractor/
-│       │   │   ├── image_agent.py
-│       │   │   ├── layout_agent.py
-│       │   │   └── copy_agent.py
-│       │   ├── architect.py
-│       │   ├── generator.py
-│       │   └── critic.py
-│       ├── main.py
-│       └── config.py
-├── .env
-├── pyproject.toml
-└── README.md
-```
-
----
-
-## 5. Roadmap
-
-- [x] Vision 기반 스타일 추출 모듈 구현
-- [x] uv 기반 패키지 관리 도입
-- [ ] 멀티모달 기반 가이드라인 검증 로직 고도화
-- [ ] Feedback Loop 최적화 및 토큰 비용 감소 전략 적용
-
----
-
-## 6. License
-
-MIT License  
-Copyright (c) 2026
+*MIT License*

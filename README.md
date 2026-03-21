@@ -115,13 +115,28 @@ src/da_agent/
 ## 빠른 시작
 
 ```bash
-git clone https://github.com/KJooolee/Hyper-Personalized-DA-Auto-Generation-Agent.git
-cd Hyper-Personalized-DA-Auto-Generation-Agent
+git clone https://github.com/KJooolee/hyperpersonal-ad-agent.git
+cd hyperpersonal-ad-agent
 uv sync
 cp .env.example .env   # API 키 입력 (OpenAI, fal.ai)
 uv run python -m da_agent
 ```
 
 ---
+## Known Limitations & Next Steps
+
+**이미지 생성 — 제품 형태 변형**  
+txt2img 방식(FLUX.1)은 텍스트 프롬프트만으로 
+원본 제품의 형태를 보존하기 어려움. 
+배경 생성과 제품 합성을 완전히 분리하거나, 
+ControlNet(Canny/Depth)을 활용한 img2img로 
+형태 보존 조건을 추가하는 방향으로 개선 필요.
+
+**레이아웃 — LLM의 픽셀 좌표 불안정**  
+LLM이 의미적 레이아웃 판단(위치·크기 관계)은 
+잘 수행하나, 절대 픽셀 좌표로의 변환에서 
+일관성이 떨어짐. 캔버스를 Named Zone으로 
+분할하고 LLM은 존 선택만, 좌표 계산은 
+코드로 위임하는 구조로 개선 예정.
 
 *MIT License*

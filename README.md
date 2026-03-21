@@ -126,11 +126,11 @@ uv run python -m da_agent
 ## Known Limitations & Next Steps
 
 **이미지 생성 — 제품 형태 변형**  
-txt2img 방식(FLUX.1)은 텍스트 프롬프트만으로 
-원본 제품의 형태를 보존하기 어려움. 
-배경 생성과 제품 합성을 완전히 분리하거나, 
-ControlNet(Canny/Depth)을 활용한 img2img로 
-형태 보존 조건을 추가하는 방향으로 개선 필요.
+FLUX.1(txt2img)은 영문 모델 특성상 한국어 프롬프트 이해도가 낮고,  
+제품 형태를 변형시키는 문제 확인.  
+Gemini 2.5 Flash Image(나노바나나)로 교체 예정 —  
+img2img 방식으로 원본 제품 이미지를 reference로 직접 전달하는  
+구조로 전환하여 형태 보존 및 스타일 적용 분리 목표.
 
 **레이아웃 — LLM의 픽셀 좌표 불안정**  
 LLM이 의미적 레이아웃 판단(위치·크기 관계)은 
